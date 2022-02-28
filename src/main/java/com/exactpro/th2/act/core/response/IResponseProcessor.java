@@ -1,0 +1,40 @@
+/*
+ * Copyright 2022-2022 Exactpro (Exactpro Systems Limited)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.exactpro.th2.act.core.response;
+
+import com.exactpro.th2.act.core.requests.RequestContext;
+import com.exactpro.th2.common.grpc.Message;
+import com.exactpro.th2.common.grpc.MessageID;
+
+import java.util.Collection;
+import java.util.List;
+
+public interface IResponseProcessor {
+    /**
+     * Processes the messages sent by the system in response to a submitted message.
+     *
+     * @param responseMessages    A {@link List} of received messages as {@link Message} objects.
+     * @param processedMessageIDs A {@link Collection} of {@link MessageID}s of all messages processed while
+     *                            anticipating the system's response.
+     * @param responder           The {@link IResponder} to be used to send a response to the client.
+     * @param requestContext      The {@link RequestContext} of the request for which these messages are being processed.
+     */
+    void process(List<Message> responseMessages,
+                 Collection<MessageID> processedMessageIDs,
+                 IResponder responder,
+                 RequestContext requestContext);
+}

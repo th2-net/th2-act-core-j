@@ -1,0 +1,131 @@
+plugins {
+    id "org.jetbrains.kotlin.jvm" version "$kotlin_version"
+    id 'java-library'
+    id 'maven-publish'
+}
+
+ext {
+    sharedDir = file("${project.rootDir}/shared")
+}
+
+group = "com.exactpro.th2"
+version = release_version
+
+sourceCompatibility = 11
+targetCompatibility = 11
+
+compileKotlin {
+    kotlinOptions.jvmTarget = "11"
+}
+
+compileTestKotlin {
+    kotlinOptions.jvmTarget = "11"
+}
+
+repositories {
+    maven {
+        name "Central"
+        url "https://nexus.exactpro.com/repository/maven-central/"
+    }
+
+    maven {
+        name "Bintray"
+        url "https://nexus.exactpro.com/repository/th2-bintray/"
+    }
+
+    maven {
+        name "Nexus"
+        url "https://nexus.exactpro.com/repository/th2-maven/"
+    }
+
+    mavenLocal()
+}
+
+dependencies {
+    api platform("com.exactpro.th2:bom:3.0.0")
+
+    api "com.exactpro.th2:common:3.26.4"
+    api "com.exactpro.th2:grpc-check1:3.4.2"
+
+    implementation "io.github.microutils:kotlin-logging:1.12.5"
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
+
+    implementation "org.slf4j:slf4j-api"
+
+    testImplementation "org.junit.jupiter:junit-jupiter:5.4.2"
+    // to tests only
+    testImplementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.4.3"
+
+    testImplementation("org.slf4j:slf4j-log4j12") {
+        because('need logs in tests')
+    }
+    testImplementation "org.junit.jupiter:junit-jupiter:5.7.1"
+    testImplementation "io.strikt:strikt-core:0.31.0"
+    testImplementation "io.mockk:mockk:1.12.0"
+}
+
+jar {
+    manifest {
+        attributes(
+                "Created-By": "${System.getProperty("java.version")} (${System.getProperty("java.vendor")})",
+                "Specification-Title": "Act Core",
+                "Specification-Vendor": "Exactpro Systems LLC",
+                "Implementation-Title": project.archivesBaseName,
+                "Implementation-Vendor": "Exactpro Systems LLC",
+                "Implementation-Vendor-Id": "com.exactpro",
+                "Implementation-Version": project.version
+        )
+    }
+}
+
+test {
+    useJUnitPlatform()
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from(components.java)
+            pom {
+                name = rootProject.name
+                packaging = 'jar'
+                description = rootProject.description
+                url = vcs_url
+                scm {
+                    url = vcs_url
+                }
+                licenses {
+                    license {
+                        name = 'The Apache License, Version 2.0'
+                        url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                    }
+                }
+                developers {
+                    developer {
+                        id = 'developer'
+                        name = 'developer'
+                        email = 'developer@exactpro.com'
+                    }
+                }
+                scm {
+                    url = vcs_url
+                }
+            }
+        }
+    }
+    repositories {
+        maven {
+            name = 'localRepo'
+            url = sharedDir
+        }
+//Nexus repo to publish from gitlab
+        maven {
+            name = 'nexusRepository'
+            credentials {
+                username = project.findProperty('nexus_user')
+                password = project.findProperty('nexus_password')
+            }
+            url = project.findProperty('nexus_url')
+        }
+    }
+}

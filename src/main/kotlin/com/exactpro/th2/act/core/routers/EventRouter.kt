@@ -1,0 +1,279 @@
+/*
+ * Copyright 2022-2022 Exactpro (Exactpro Systems Limited)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.exactpro.th2.act.core.routers
+
+import com.exactpro.th2.act.core.messages.MessageMapping
+import com.exactpro.th2.act.core.requests.IRequest
+import com.exactpro.th2.act.core.response.IBodyDataFactory
+import com.exactpro.th2.common.event.Event
+import com.exactpro.th2.common.event.EventUtils.createMessageBean
+import com.exactpro.th2.common.event.IBodyData
+import com.exactpro.th2.common.grpc.EventBatch
+import com.exactpro.th2.common.grpc.EventID
+import com.exactpro.th2.common.grpc.Message
+import com.exactpro.th2.common.grpc.MessageID
+import com.exactpro.th2.common.message.messageType
+import com.exactpro.th2.common.message.toTreeTable
+import com.exactpro.th2.common.schema.message.MessageRouter
+import com.fasterxml.jackson.core.JsonProcessingException
+import com.google.protobuf.TextFormat
+import mu.KotlinLogging
+import java.io.IOException
+
+private val LOGGER = KotlinLogging.logger {}
+
+class EventRouter(private val eventBatchRouter: MessageRouter<EventBatch>) {
+
+    /**
+     * Submits the specified event to the underlying event batch router.
+     *
+     * @param eventRequest The event to be submitted.
+     * @param parentEventID The ID of the parent event.
+     *
+     * @throws IOException In the event count not be submitted.
+     * @throws IllegalStateException If more than one Message Queue was found for the events.
+     */
+    fun storeEvent(eventRequest: Event, parentEventID: EventID? = null): EventID {
+        val protoEvent = eventRequest.asProto(parentEventID)
+
+        try {
+            LOGGER.debug { "Storing event: ${TextFormat.shortDebugString(protoEvent)}" }
+            eventBatchRouter.send(EventBatch.newBuilder().addEvents(protoEvent).build())
+            return protoEvent.id
+        } catch (e: Exception) {
+            LOGGER.error(e) { "Could not store event with ID ${protoEvent.id}." }
+            throw e
+        }
+    }
+
+    /**
+     * Submits all of the specified events to the underlying event batch router. The ID of the parent event can
+     * optionally be specified.
+     *
+     * @throws IOException In the event count not be submitted.
+     * @throws IllegalStateException If more than one Message Queue was found for the events.
+     */
+    fun storeEvents(eventRequest: Collection<Event>, parentEventId: EventID? = null) {
+        val protoEvents = eventRequest.map { it.asProto(parentEventId) }
+
+        try {
+            LOGGER.debug {
+                "Storing events: ${protoEvents.joinToString(",") { TextFormat.shortDebugString(it) }}"
+            }
+
+            val builder = EventBatch.newBuilder()
+            if (parentEventId != null) {
+                builder.parentEventId = parentEventId
+            }
+            eventBatchRouter.send(builder.addAllEvents(protoEvents).build())
+
+        } catch (e: Exception) {
+            LOGGER.error(e) { "Could not store events ${protoEvents.joinToString(",") { it.id.toString() }}." }
+            throw e
+        }
+    }
+
+    /**
+     * Creates a parent estore event for the specified connection and method call.
+     *
+     * @param request         The [IRequest] for which this parent event should be created.
+     * @param rpcName         The name of the service method that is being called (Will be a part of the event name).
+     * @param status          The initial status of the event as a [Event.Status].
+     * @return The ID of the created event as an [EventID].
+     *
+     * @throws EventSubmissionException If an error occurs while creating the specified event.
+     */
+    fun createParentEvent(request: IRequest, rpcName: String, status: Event.Status): EventID {
+        return createEvent(
+            status,
+            type = rpcName,
+            name = "$rpcName for ${request.requestMessage.metadata.id.connectionId.sessionAlias}",
+            description = request.requestDescription,
+            parentEventID = request.requestMessage.parentEventId
+        )
+    }
+
+    /**
+     * Creates a send message event from the specified message. The parent event can optionally be specified.
+     *
+     * @param message The message to be included in the event.
+     * @param parentEventID The ID of the parent event as an [EventID]
+     *
+     * @return The ID of the created event as an [EventID].
+     *
+     * @throws EventSubmissionException If an error occurs while creating the specified event.
+     */
+    fun createSendMessageEvent(message: Message, parentEventID: EventID? = null): EventID {
+        return createEvent(
+            Event.Status.PASSED,
+            type = "Outgoing Message",
+            name = "Send ${message.metadata.messageType} message to connectivity",
+            body = listOf(message.toTreeTable()),
+            parentEventID = parentEventID
+        )
+    }
+
+    /**
+     * Creates response received events from the specified message list. The parent event for these events can
+     * optionally be specified.
+     *
+     * @param messages The [List] of received [Message]s to be included in the event.
+     * @param eventStatus The status to be set for the response received events.
+     * @param parentEventID The ID of the parent event as an [EventID]
+     *
+     * @throws EventSubmissionException If an error occurs while creating the specified events.
+     */
+    fun createResponseReceivedEvents(
+        messages: List<Message>, eventStatus: Event.Status, parentEventID: EventID? = null
+    ) {
+        val events = Array(messages.size) { messages[it] }.map { message ->
+            Event.start()
+                    .name("Received a ${message.messageType} message")
+                    .type("Received Message")
+                    .status(eventStatus)
+                    .bodyData(message.toTreeTable())
+                    .messageID(message.metadata.id)
+        }
+
+        try {
+            storeEvents(events, parentEventID)
+        } catch (e: IOException) {
+            throw EventSubmissionException("Can not store events $events", e)
+        }
+    }
+
+    /**
+     * Creates a no response received event (i.e. The expected response was not received from the system).
+     * The parent event can optionally be specified.
+     *
+     * @param noResponseBodyFactory The body data supplier for this event.
+     * @param processedMessageIDs A [Collection] of [MessageID]s linked to this event.
+     * @param parentEventID The ID of the parent event as an [EventID]
+     *
+     * @return The ID of the created event as an [EventID].
+     *
+     * @throws EventSubmissionException If an error occurs while creating the specified event.
+     */
+    fun createNoResponseEvent(
+        noResponseBodyFactory: IBodyDataFactory,
+        processedMessageIDs: Collection<MessageID>,
+        parentEventID: EventID? = null
+    ): EventID {
+        return createEvent(
+            Event.Status.FAILED,
+            type = "Error",
+            name = "No Response Received",
+            description = "The expected response was not received.",
+            body = noResponseBodyFactory.createBodyData(),
+            parentEventID = parentEventID,
+            linkedMessages = processedMessageIDs
+        )
+    }
+
+    /**
+     * Creates a no matching mapping event. The parent event can optionally be specified.
+     *
+     * @param expectedMappings A [Collection] of the expected [MessageMapping]s.
+     * @param receivedMessages A [Collection] of the actually received messages.
+     * @param parentEventID The ID of the parent event as an [EventID]
+     *
+     * @return The Id of the created event as an [EventID].
+     *
+     * @throws EventSubmissionException If an error occurs while creating the specified event.
+     */
+    fun createNoMappingEvent(
+        expectedMappings: Collection<MessageMapping>,
+        receivedMessages: Collection<Message>,
+        parentEventID: EventID? = null
+    ): EventID {
+        val receivedMessageTypes = receivedMessages.map { it.metadata.messageType }
+        val eventBodyData = expectedMappings.map {
+            createMessageBean("${it.statusMapping.eventStatus} on messages: ${it.messageTypes}")
+        }
+
+        return createEvent(Event.Status.FAILED,
+                           type = "Error",
+                           name = "No matching message mapping was found.",
+                           description = "No matching message mapping found for the messages $receivedMessageTypes.",
+                           body = eventBodyData,
+                           parentEventID = parentEventID,
+                           linkedMessages = receivedMessages.map { it.metadata.id })
+    }
+
+    /**
+     * Creates an error event with the specified cause. The parent event can optionally be specified.
+     *
+     * @param cause The cause of the error as a string.
+     * @param parentEventID The ID of the parent event as an [EventID]
+     *
+     * @return The ID of the created event as an [EventID].
+     *
+     * @throws EventSubmissionException If an error occurs while creating the specified event.
+     */
+    fun createErrorEvent(cause: String, parentEventID: EventID? = null): EventID {
+        return createEvent(
+            Event.Status.FAILED,
+            type = "Error",
+            name = "An Error has occurred",
+            description = cause,
+            parentEventID = parentEventID
+        )
+    }
+
+    /**
+     * Creates an event and submits it to the event batch router.
+     *
+     * @return The ID of the created event as an [EventID].
+     *
+     * @throws EventSubmissionException If an error occurs while creating the specified event.
+     */
+    private fun createEvent(
+        status: Event.Status,
+        type: String = "No Type",
+        name: String = "No Name",
+        description: String = "No Description",
+        body: Collection<IBodyData> = emptyList(),
+        parentEventID: EventID? = null,
+        linkedMessages: Collection<MessageID> = emptyList()
+    ): EventID {
+
+        val event = Event.start()
+                .name(name)
+                .description(description)
+                .type(type)
+                .bodyData(body)
+                .status(status).also {
+                    linkedMessages.forEach { messageID -> it.messageID(messageID) }
+                }.endTimestamp()
+
+        return try {
+            storeEvent(event, parentEventID)
+        } catch (e: IOException) {
+            throw EventSubmissionException("Can not send event ${event.id}", e)
+        }
+    }
+
+    /**
+     * Converts the specified event to a gRPC event and returns it. The parent ID for the gRPC event
+     * can be specified.
+     */
+    private fun Event.asProto(parentEventID: EventID?) = try {
+            this.toProto(parentEventID)
+        } catch (e: JsonProcessingException) {
+            throw EventSubmissionException("Couldn't parse event $this.", e)
+    }
+}
