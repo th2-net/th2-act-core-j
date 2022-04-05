@@ -42,8 +42,6 @@ class Context (private val messageRouter: MessageRouter, private val responseMon
 
         val expectedMessage = Message.newBuilder().apply{
             this.sessionAlias = sessionAlias
-            this.direction = direction
-            this.messageType = "NewOrderSingle"
         }.build()
 
         val request = Request(expectedMessage)
