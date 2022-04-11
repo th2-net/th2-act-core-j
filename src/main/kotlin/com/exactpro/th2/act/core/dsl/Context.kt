@@ -23,11 +23,11 @@ fun context(messageRouter: MessageRouter,
 
     if (sessionAlias.size > 1) {
         action.invoke(
-            Context(messageRouter, responseMonitor, subscriptionManager, sessionAlias[0], direction[0], sessionAlias[1], direction[1])
+            Context(messageRouter, responseMonitor, subscriptionManager, sessionAlias[0], direction[0], sessionAlias[1], direction[1], preFilter)
         )
     }
     else {
-        action.invoke(Context(messageRouter, responseMonitor, subscriptionManager, sessionAlias[0], direction[0]))
+        action.invoke(Context(messageRouter, responseMonitor, subscriptionManager, sessionAlias[0], direction[0], preFilter))
     }
 }
 
@@ -36,22 +36,75 @@ fun context(messageRouter: MessageRouter,
             subscriptionManager: SubscriptionManager,
 
             sessionAlias: String,
+            direction: Direction,
             anotherSessionAlias: String,
             preFilter: (Message) -> Unit = {},
             action: Context.() -> Unit){
-    action.invoke(Context(messageRouter, responseMonitor, subscriptionManager, sessionAlias,  Direction.FIRST, anotherSessionAlias))
+    action.invoke(Context(messageRouter, responseMonitor, subscriptionManager, sessionAlias, direction, anotherSessionAlias, preFilter))
 }
 
-class Context(private val messageRouter: MessageRouter,
-              private val responseMonitor: IMessageResponseMonitor,
-              private val subscriptionManager: SubscriptionManager,
+class Context{
+    private lateinit var messageRouter: MessageRouter
+    private lateinit var responseMonitor: IMessageResponseMonitor
+    private lateinit var subscriptionManager: SubscriptionManager
 
-              private val sessionAlias: String,
-              private val direction: Direction,
-              private val anotherSessionAlias: String = "",
-              private val anotherDirection: Direction = Direction.FIRST,
+    private lateinit var sessionAlias: String
+    private lateinit var direction: Direction
+    private lateinit var anotherSessionAlias: String
+    private lateinit var anotherDirection: Direction
 
-              private val preFilter: (Message) -> Unit = {}) {
+    private lateinit var preFilter: (Message) -> Unit
+
+    constructor(messageRouter: MessageRouter,
+                responseMonitor: IMessageResponseMonitor,
+                subscriptionManager: SubscriptionManager,
+
+                sessionAlias: String,
+                direction: Direction,
+                preFilter: (Message) -> Unit = {}){
+        initialize(messageRouter, responseMonitor, subscriptionManager, sessionAlias, direction, preFilter)
+    }
+
+    constructor(messageRouter: MessageRouter,
+                responseMonitor: IMessageResponseMonitor,
+                subscriptionManager: SubscriptionManager,
+
+                sessionAlias: String,
+                direction: Direction,
+                anotherSessionAlias: String,
+                anotherDirection: Direction,
+                preFilter: (Message) -> Unit = {}){
+        initialize(messageRouter, responseMonitor, subscriptionManager, sessionAlias, direction, preFilter)
+        this.anotherSessionAlias = anotherSessionAlias
+        this.anotherDirection = anotherDirection
+    }
+
+    constructor(messageRouter: MessageRouter,
+                responseMonitor: IMessageResponseMonitor,
+                subscriptionManager: SubscriptionManager,
+                sessionAlias: String,
+                direction: Direction,
+                anotherSessionAlias: String,
+                preFilter: (Message) -> Unit = {}){
+        initialize(messageRouter, responseMonitor, subscriptionManager, sessionAlias, direction,  preFilter)
+        this.anotherSessionAlias = anotherSessionAlias
+    }
+
+    private fun initialize(messageRouter: MessageRouter,
+                           responseMonitor: IMessageResponseMonitor,
+                           subscriptionManager: SubscriptionManager,
+                           sessionAlias: String,
+                           direction: Direction,
+                           preFilter: (Message) -> Unit){
+        this.messageRouter = messageRouter
+        this.responseMonitor = responseMonitor
+        this.subscriptionManager = subscriptionManager
+        this.sessionAlias = sessionAlias
+        this.direction = direction
+        if(preFilter != {}){
+            this.preFilter = preFilter
+        }
+    }
 
     fun send(message: Message, waitEcho: Boolean = false, cleanBuffer: Boolean = true): Message { //TODO cleanBuffer
         messageRouter.sendMessage(message)
