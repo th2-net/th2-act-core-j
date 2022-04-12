@@ -1,6 +1,7 @@
 package com.exactpro.th2.act.dsl
 
 import com.exactpro.th2.act.*
+import com.exactpro.th2.act.core.dsl.`do`
 import com.exactpro.th2.act.core.dsl.context
 import com.exactpro.th2.act.core.routers.MessageRouter
 import com.exactpro.th2.act.core.managers.SubscriptionManager
@@ -8,9 +9,11 @@ import com.exactpro.th2.act.core.monitors.IMessageResponseMonitor
 import com.exactpro.th2.act.stubs.StubMessageRouter
 import com.exactpro.th2.common.grpc.ConnectionID
 import com.exactpro.th2.common.grpc.Direction
+import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.grpc.MessageBatch
 import com.exactpro.th2.common.message.direction
 import com.exactpro.th2.common.message.messageType
+import com.exactpro.th2.common.message.sequence
 import com.exactpro.th2.common.message.sessionAlias
 import io.mockk.justRun
 import io.mockk.mockk
@@ -38,7 +41,7 @@ class TestDSL {
     @Test
     fun `send message and wait echo`() {
         val message = randomMessage()
-        context(messageRouter, responseMonitor, subscriptionManager, mapOf("sessionAlias" to Direction.FIRST)) {
+        context(messageRouter, responseMonitor, subscriptionManager, mapOf("sessionAlias" to Direction.FIRST)) `do` {
 
             val connectionID: ConnectionID = ConnectionID.newBuilder().setSessionAlias(message.sessionAlias).build()
             send(message, true)
@@ -57,7 +60,9 @@ class TestDSL {
     @Test
     fun `receive one message`() {
         val message = randomMessage()
-        context(messageRouter, responseMonitor, subscriptionManager, mapOf("sessionAlias" to Direction.FIRST)) {
+        context(messageRouter, responseMonitor, subscriptionManager, mapOf("sessionAlias" to Direction.FIRST)){ msg: Message ->
+            msg.sessionAlias == "sessionAlias" && msg.direction == Direction.FIRST
+        } `do` {
             send(message)
 
             receive {
@@ -67,6 +72,9 @@ class TestDSL {
                 failOn("NewOrderSingle") {
                     direction == Direction.SECOND
                 }
+                failOn("NewOrderSingle") {
+                    sequence == message.sequence
+                }
             }
         }
     }
@@ -74,7 +82,7 @@ class TestDSL {
     @Test
     fun `repeat until`() {
         val message = randomMessage()
-        context(messageRouter, responseMonitor, subscriptionManager, "sessionAlias", "anotherSessionAlias"){
+        context(messageRouter, responseMonitor, subscriptionManager, "sessionAlias", Direction.FIRST,"anotherSessionAlias") `do` {
             val msg = send(message)
 
             repeatUntil (msg){ mes ->
@@ -91,5 +99,4 @@ class TestDSL {
             }
         }
     }
-
 }
