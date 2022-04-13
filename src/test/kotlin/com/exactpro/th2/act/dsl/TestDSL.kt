@@ -7,12 +7,10 @@ import com.exactpro.th2.act.core.routers.MessageRouter
 import com.exactpro.th2.act.core.managers.SubscriptionManager
 import com.exactpro.th2.act.core.monitors.IMessageResponseMonitor
 import com.exactpro.th2.act.stubs.StubMessageRouter
-import com.exactpro.th2.common.grpc.ConnectionID
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.grpc.MessageBatch
 import com.exactpro.th2.common.message.direction
-import com.exactpro.th2.common.message.messageType
 import com.exactpro.th2.common.message.sequence
 import com.exactpro.th2.common.message.sessionAlias
 import io.mockk.justRun
@@ -20,8 +18,6 @@ import io.mockk.mockk
 import io.mockk.spyk
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import strikt.api.expect
-import strikt.assertions.isEqualTo
 
 class TestDSL {
 
@@ -42,29 +38,18 @@ class TestDSL {
     fun `send message and wait echo`() {
         val message = randomMessage()
         context(messageRouter, responseMonitor, subscriptionManager, mapOf("sessionAlias" to Direction.FIRST)) `do` {
-
-            val connectionID: ConnectionID = ConnectionID.newBuilder().setSessionAlias(message.sessionAlias).build()
             send(message, true)
-
-            expect {
-                that(messageBatchRouter.sent.messagesList.size).isEqualTo(1)
-                that(messageBatchRouter.sent.messagesList.first()).apply {
-                    get { metadata.id.connectionId }.isEqualTo(connectionID)
-                    get { metadata.messageType }.isEqualTo(message.messageType)
-                    get { fieldsMap }.isEqualTo(message.fieldsMap)
-                }
-            }
         }
     }
 
     @Test
     fun `receive one message`() {
         val message = randomMessage()
-        context(messageRouter, responseMonitor, subscriptionManager, mapOf("sessionAlias" to Direction.FIRST)){ msg: Message ->
+
+        context(messageRouter, responseMonitor, subscriptionManager, mapOf("sessionAlias" to Direction.FIRST, "anotherSessionAlias" to Direction.FIRST)){ msg: Message ->
             msg.sessionAlias == "sessionAlias" && msg.direction == Direction.FIRST
         } `do` {
             send(message)
-
             receive {
                 passOn("NewOrderSingle") {
                     direction == Direction.FIRST
@@ -82,18 +67,19 @@ class TestDSL {
     @Test
     fun `repeat until`() {
         val message = randomMessage()
-        context(messageRouter, responseMonitor, subscriptionManager, "sessionAlias", Direction.FIRST,"anotherSessionAlias") `do` {
-            val msg = send(message)
 
-            repeatUntil (msg){ mes ->
-                mes.sessionAlias == msg.sessionAlias
+        context(messageRouter, responseMonitor, subscriptionManager,  "sessionAlias", Direction.FIRST, "anotherSessionAlias") `do` {
+            send(message)
+
+            repeatUntil{ mes ->
+                mes.sessionAlias == "sessionAlias"
             } `do` {
                 receive{
                     passOn("NewOrderSingle") {
-                        msg.direction == Direction.FIRST
+                        direction == Direction.FIRST
                     }
                     failOn("NewOrderSingle") {
-                        msg.direction == Direction.SECOND
+                        direction == Direction.SECOND
                     }
                 }
             }
