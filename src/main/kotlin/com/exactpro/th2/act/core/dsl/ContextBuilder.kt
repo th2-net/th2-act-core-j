@@ -1,67 +1,64 @@
+/*
+ * Copyright 2022-2022 Exactpro (Exactpro Systems Limited)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.exactpro.th2.act.core.dsl
 
+import com.exactpro.th2.act.core.handlers.IRequestHandler
 import com.exactpro.th2.act.core.managers.SubscriptionManager
-import com.exactpro.th2.act.core.monitors.IMessageResponseMonitor
-import com.exactpro.th2.act.core.receivers.MessageReceiver
-import com.exactpro.th2.act.core.requests.Request
+import com.exactpro.th2.act.core.routers.EventRouter
 import com.exactpro.th2.act.core.routers.MessageRouter
-import com.exactpro.th2.act.core.rules.EchoCheckRule
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.Message
-import com.exactpro.th2.common.message.sessionAlias
 
 fun context(
+    handler: IRequestHandler,
     messageRouter: MessageRouter,
-    responseMonitor: IMessageResponseMonitor,
-    subscriptionManager: SubscriptionManager,
+    eventRouter: EventRouter,
 
     connectivity: Map<String, Direction>,
-    preFilter: ((Message) -> Boolean)? = null): Context{
+    preFilter: ((Message) -> Boolean)? = null
+): Context {
 
-    val sessionAlias = connectivity.keys.toTypedArray()
-    val direction = connectivity.values.toTypedArray()
+    val sessionAliasList = listOf<String>().plus(connectivity.keys.toTypedArray())
+    val directionList = listOf<Direction>().plus(connectivity.values.toTypedArray())
+    val subscriptionManager = sessionAliasList.subscriptionManager(directionList)
 
-    val messageReceiver = cacheFiltering(responseMonitor, subscriptionManager, sessionAlias[0], direction[0], preFilter)
-
-    return if (sessionAlias.size > 1) {
-        Context(messageRouter, messageReceiver, sessionAlias[0], direction[0], sessionAlias[1], direction[1])
-    }
-    else {
-        Context(messageRouter, messageReceiver, sessionAlias[0], direction[0])
-    }
+    return Context(handler, subscriptionManager, messageRouter, eventRouter)
 }
 
 fun context(
+    handler: IRequestHandler,
     messageRouter: MessageRouter,
-    responseMonitor: IMessageResponseMonitor,
-    subscriptionManager: SubscriptionManager,
+    eventRouter: EventRouter,
 
     sessionAlias: String,
     direction: Direction,
     anotherSessionAlias: String,
-    preFilter: ((Message) -> Boolean)? = null): Context{
-
-    val messageReceiver = cacheFiltering(responseMonitor, subscriptionManager, sessionAlias, direction, preFilter)
-    return  Context(messageRouter, messageReceiver, sessionAlias, direction, anotherSessionAlias)
-}
-
-fun cacheFiltering(responseMonitor: IMessageResponseMonitor,
-                   subscriptionManager: SubscriptionManager,
-
-                   sessionAlias: String,
-                   direction: Direction,
-                   preFilter: ((Message) -> Boolean)?): MessageReceiver {
-    val expectedMessage = Message.newBuilder().apply {
-        this.sessionAlias = sessionAlias
-    }.build()
-
-    val request = Request(expectedMessage)
-    val checkRule = EchoCheckRule(request.requestMessage, request.requestMessage.parentEventId, preFilter)
-
-    return MessageReceiver(subscriptionManager, responseMonitor, checkRule, direction)
+    preFilter: ((Message) -> Boolean)? = null
+): Context {
+    val sessionAliasList = listOf(sessionAlias, anotherSessionAlias)
+    val directionList = listOf(direction)
+    val subscriptionManager = sessionAliasList.subscriptionManager(directionList)
+    return Context(handler, subscriptionManager, messageRouter, eventRouter)
 }
 
 infix fun Context.`do`(action: Context.() -> Unit) {
     action.invoke(this)
 }
 
+infix fun List<String>.subscriptionManager(direction: List<Direction>): SubscriptionManager{
+    return SubscriptionManager(this, direction)
+}

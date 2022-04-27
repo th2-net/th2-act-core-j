@@ -16,29 +16,28 @@
 
 package com.exactpro.th2.act.core.dsl
 
+import com.exactpro.th2.act.core.response.IResponder
+import com.exactpro.th2.common.grpc.Checkpoint
 import com.exactpro.th2.common.grpc.Message
+import com.exactpro.th2.common.grpc.RequestStatus
 
-class ReceiveBuilder(private val message: Message) {
-    enum class Status { PASSED, FAILED }
+class Responder : IResponder { //todo my class
+    var responseMessages = mutableListOf<Message>() //TODO
 
-    private val fail = Status.FAILED
-    private val pass = Status.PASSED
+    var responseIsSent: Boolean = false
+    var sentStatus: RequestStatus.Status? = null
 
-    private var status: Boolean = false
-
-    fun passOn(msgType: String, filter: Message.() -> Boolean): Boolean {
-        return pass.on(msgType, filter)
+    override fun onError(cause: String) {//todo
+        sentStatus = RequestStatus.Status.ERROR
     }
 
-    fun failOn(msgType: String, filter: Message.() -> Boolean): Boolean {
-        return fail.on(msgType, filter)
-    }
+    override fun isResponseSent() = responseIsSent //todo
 
-    fun Status.on(msgType: String, filter: Message.() -> Boolean): Boolean{
-        if(message.metadata.messageType == msgType && filter.invoke(message)){
-            if (this == pass) status = true
-            if (this == fail && !status) status = false
+    override fun onResponseFound(
+        status: RequestStatus.Status, checkpoint: Checkpoint, responses: List<Message>
+    ) {
+        for (msg in responses) {
+            responseMessages.add(msg)
         }
-        return status
     }
 }
