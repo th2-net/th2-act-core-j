@@ -38,7 +38,6 @@ class TestDSL {
     private lateinit var subscriptionManager: SubscriptionManager
     private lateinit var messageRouter: MessageRouter
     private lateinit var eventRouter: EventRouter
-
     private lateinit var handler:  TestSystemResponseReceiver.StubRequestHandler
 
     @BeforeEach
@@ -65,7 +64,7 @@ class TestDSL {
         val messages = listOf<Message>(Message.newBuilder().setMetadata(metadataOne).setParentEventId(parentEventId).build(),
             Message.newBuilder().setMetadata(metadataTwo).setParentEventId(parentEventId).build())
 
-        subscriptionManager = SubscriptionManager(listOf("sessionAlias"), listOf(Direction.FIRST, Direction.SECOND))
+        subscriptionManager = subscriptionManager(listOf("sessionAlias"), listOf(Direction.FIRST, Direction.SECOND))
         handler respondsWith {
                 subscriptionManager.handler(randomString(), messages[1].toBatch())
         }
@@ -92,7 +91,7 @@ class TestDSL {
 
         val messages = mutableListOf<Message>(expectedMessage)
 
-        subscriptionManager = listOf("sessionAlias", "anotherSessionAlias").subscriptionManager(listOf(Direction.FIRST))
+        subscriptionManager = subscriptionManager(listOf("sessionAlias", "anotherSessionAlias"), listOf(Direction.FIRST))
 
         handler respondsWith {
             messages.forEach {
@@ -146,8 +145,7 @@ class TestDSL {
                 this.parentEventId = EventID.newBuilder().setId("eventId2").build()
             }.build())
 
-
-        subscriptionManager = SubscriptionManager(listOf("sessionAlias", "anotherSessionAlias"), listOf(Direction.FIRST))
+        subscriptionManager = subscriptionManager(listOf("sessionAlias", "anotherSessionAlias"), listOf(Direction.FIRST))
 
         handler respondsWith {
             messages.forEach {

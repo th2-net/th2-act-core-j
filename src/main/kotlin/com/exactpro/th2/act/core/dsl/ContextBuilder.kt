@@ -22,19 +22,41 @@ import com.exactpro.th2.act.core.routers.EventRouter
 import com.exactpro.th2.act.core.routers.MessageRouter
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.Message
+import com.exactpro.th2.common.message.direction
+import com.exactpro.th2.common.message.sessionAlias
+
+fun context(
+    handler: IRequestHandler,
+    messageRouter: MessageRouter,
+    eventRouter: EventRouter
+): Context {
+    val subscriptionManager = SubscriptionManager()
+    return Context(handler, subscriptionManager, messageRouter, eventRouter)
+}
 
 fun context(
     handler: IRequestHandler,
     messageRouter: MessageRouter,
     eventRouter: EventRouter,
 
-    connectivity: Map<String, Direction>,
-    preFilter: ((Message) -> Boolean)? = null
+    preFilter: ((Message) -> Boolean)
+): Context {
+
+    val subscriptionManager = subscriptionManager(preFilter)
+    return Context(handler, subscriptionManager, messageRouter, eventRouter)
+}
+
+fun context(
+    handler: IRequestHandler,
+    messageRouter: MessageRouter,
+    eventRouter: EventRouter,
+
+    connectivity: Map<String, Direction>
 ): Context {
 
     val sessionAliasList = listOf<String>().plus(connectivity.keys.toTypedArray())
     val directionList = listOf<Direction>().plus(connectivity.values.toTypedArray())
-    val subscriptionManager = sessionAliasList.subscriptionManager(directionList)
+    val subscriptionManager = subscriptionManager(sessionAliasList, directionList)
 
     return Context(handler, subscriptionManager, messageRouter, eventRouter)
 }
@@ -46,12 +68,11 @@ fun context(
 
     sessionAlias: String,
     direction: Direction,
-    anotherSessionAlias: String,
-    preFilter: ((Message) -> Boolean)? = null
+    anotherSessionAlias: String
 ): Context {
     val sessionAliasList = listOf(sessionAlias, anotherSessionAlias)
     val directionList = listOf(direction)
-    val subscriptionManager = sessionAliasList.subscriptionManager(directionList)
+    val subscriptionManager = subscriptionManager(sessionAliasList, directionList)
     return Context(handler, subscriptionManager, messageRouter, eventRouter)
 }
 
@@ -59,6 +80,10 @@ infix fun Context.`do`(action: Context.() -> Unit) {
     action.invoke(this)
 }
 
-infix fun List<String>.subscriptionManager(direction: List<Direction>): SubscriptionManager{
-    return SubscriptionManager(this, direction)
+fun subscriptionManager(sessionAliasList: List<String>, directionList: List<Direction>): SubscriptionManager{
+    return SubscriptionManager {msg: Message -> sessionAliasList.contains(msg.sessionAlias) && directionList.contains(msg.direction)}
+}
+
+fun subscriptionManager(preFilter: ((Message) -> Boolean)): SubscriptionManager{
+    return SubscriptionManager(preFilter)
 }

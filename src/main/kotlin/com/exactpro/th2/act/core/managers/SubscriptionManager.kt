@@ -15,8 +15,14 @@
  */
 package com.exactpro.th2.act.core.managers
 
+import com.exactpro.th2.check1.grpc.PreFilter
 import com.exactpro.th2.common.grpc.Direction
+import com.exactpro.th2.common.grpc.EventID
+import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.grpc.MessageBatch
+import com.exactpro.th2.common.message.direction
+import com.exactpro.th2.common.message.messageType
+import com.exactpro.th2.common.message.sessionAlias
 import com.exactpro.th2.common.schema.message.MessageListener
 import com.google.protobuf.TextFormat
 import mu.KotlinLogging
@@ -27,7 +33,7 @@ typealias MessageBatchListener = MessageListener<MessageBatch>
 
 private val LOGGER = KotlinLogging.logger {}
 
-class SubscriptionManager: MessageListener<MessageBatch>, ISubscriptionManager {
+class SubscriptionManager(private val preFilter: ((Message) -> Boolean)? = null): MessageListener<MessageBatch>, ISubscriptionManager {
 
     private val callbacks: Map<Direction, MutableList<MessageBatchListener>> = EnumMap(
         mapOf(Direction.FIRST to CopyOnWriteArrayList(), Direction.SECOND to CopyOnWriteArrayList())
@@ -48,6 +54,7 @@ class SubscriptionManager: MessageListener<MessageBatch>, ISubscriptionManager {
         }
 
         val direction = messageBatch.messagesList.first().metadata.id.direction
+        val sessionAlias = messageBatch.messagesList.first().metadata.id.connectionId.sessionAlias
         val listeners: List<MessageBatchListener>? = callbacks[direction]
 
         if (listeners == null) {
@@ -57,7 +64,16 @@ class SubscriptionManager: MessageListener<MessageBatch>, ISubscriptionManager {
 
         listeners.forEach { listener ->
             try {
-                listener.handler(consumerTag, messageBatch)
+                if (preFilter!= null){
+                    if(preFilter.invoke(Message.newBuilder().apply {
+                        this.sessionAlias = sessionAlias
+                        this.direction = direction
+                    }.build()))
+                        listener.handler(consumerTag, messageBatch)
+                }
+                else {
+                    listener.handler(consumerTag, messageBatch)
+                }
             } catch (e: Exception) {
                 LOGGER.error(e) {
                     "Cannot handle batch from $direction. Batch: ${TextFormat.shortDebugString(messageBatch)}"
