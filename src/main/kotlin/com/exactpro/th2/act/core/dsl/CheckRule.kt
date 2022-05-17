@@ -20,10 +20,10 @@ import com.exactpro.th2.act.core.rules.AbstractSingleConnectionRule
 import com.exactpro.th2.common.grpc.ConnectionID
 import com.exactpro.th2.common.grpc.Message
 
-class CheckRule(private val connectionID: ConnectionID):
+class CheckRule(private val connectionID: ConnectionID, private val messages: List<Message>):
     AbstractSingleConnectionRule(connectionID) {
 
     override fun checkMessageFromConnection(message: Message): Boolean {
-        return connectionID == message.metadata.id.connectionId
+        return connectionID == message.metadata.id.connectionId && !messages.contains(message)
     }
 }

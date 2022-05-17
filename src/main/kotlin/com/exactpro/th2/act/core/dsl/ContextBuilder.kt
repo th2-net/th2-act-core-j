@@ -21,6 +21,7 @@ import com.exactpro.th2.act.core.managers.SubscriptionManager
 import com.exactpro.th2.act.core.routers.EventRouter
 import com.exactpro.th2.act.core.routers.MessageRouter
 import com.exactpro.th2.common.grpc.Direction
+import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.message.direction
 import com.exactpro.th2.common.message.sessionAlias
@@ -28,29 +29,30 @@ import com.exactpro.th2.common.message.sessionAlias
 fun context(
     handler: IRequestHandler,
     messageRouter: MessageRouter,
-    eventRouter: EventRouter
+    eventRouter: EventRouter,
+    parentEventID: EventID
 ): Context {
     val subscriptionManager = SubscriptionManager()
-    return Context(handler, subscriptionManager, messageRouter, eventRouter)
+    return Context(handler, subscriptionManager, messageRouter, eventRouter, parentEventID)
 }
 
 fun context(
     handler: IRequestHandler,
     messageRouter: MessageRouter,
     eventRouter: EventRouter,
-
+    parentEventID: EventID,
     preFilter: ((Message) -> Boolean)
 ): Context {
 
     val subscriptionManager = subscriptionManager(preFilter)
-    return Context(handler, subscriptionManager, messageRouter, eventRouter)
+    return Context(handler, subscriptionManager, messageRouter, eventRouter, parentEventID)
 }
 
 fun context(
     handler: IRequestHandler,
     messageRouter: MessageRouter,
     eventRouter: EventRouter,
-
+    parentEventID: EventID,
     connectivity: Map<String, Direction>
 ): Context {
 
@@ -58,14 +60,14 @@ fun context(
     val directionList = listOf<Direction>().plus(connectivity.values.toTypedArray())
     val subscriptionManager = subscriptionManager(sessionAliasList, directionList)
 
-    return Context(handler, subscriptionManager, messageRouter, eventRouter)
+    return Context(handler, subscriptionManager, messageRouter, eventRouter, parentEventID)
 }
 
 fun context(
     handler: IRequestHandler,
     messageRouter: MessageRouter,
     eventRouter: EventRouter,
-
+    parentEventID: EventID,
     sessionAlias: String,
     direction: Direction,
     anotherSessionAlias: String
@@ -73,7 +75,7 @@ fun context(
     val sessionAliasList = listOf(sessionAlias, anotherSessionAlias)
     val directionList = listOf(direction)
     val subscriptionManager = subscriptionManager(sessionAliasList, directionList)
-    return Context(handler, subscriptionManager, messageRouter, eventRouter)
+    return Context(handler, subscriptionManager, messageRouter, eventRouter, parentEventID)
 }
 
 infix fun Context.`do`(action: Context.() -> Unit) {

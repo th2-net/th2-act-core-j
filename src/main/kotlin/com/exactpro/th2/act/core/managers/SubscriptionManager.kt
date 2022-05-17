@@ -15,14 +15,9 @@
  */
 package com.exactpro.th2.act.core.managers
 
-import com.exactpro.th2.check1.grpc.PreFilter
 import com.exactpro.th2.common.grpc.Direction
-import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.grpc.MessageBatch
-import com.exactpro.th2.common.message.direction
-import com.exactpro.th2.common.message.messageType
-import com.exactpro.th2.common.message.sessionAlias
 import com.exactpro.th2.common.schema.message.MessageListener
 import com.google.protobuf.TextFormat
 import mu.KotlinLogging
@@ -53,8 +48,8 @@ class SubscriptionManager(private val preFilter: ((Message) -> Boolean)? = null)
             return
         }
 
-        val direction = messageBatch.messagesList.first().metadata.id.direction
-        val sessionAlias = messageBatch.messagesList.first().metadata.id.connectionId.sessionAlias
+        val message = messageBatch.messagesList.first()
+        val direction = message.metadata.id.direction
         val listeners: List<MessageBatchListener>? = callbacks[direction]
 
         if (listeners == null) {
@@ -65,10 +60,7 @@ class SubscriptionManager(private val preFilter: ((Message) -> Boolean)? = null)
         listeners.forEach { listener ->
             try {
                 if (preFilter!= null){
-                    if(preFilter.invoke(Message.newBuilder().apply {
-                        this.sessionAlias = sessionAlias
-                        this.direction = direction
-                    }.build()))
+                    if(preFilter.invoke(message))
                         listener.handler(consumerTag, messageBatch)
                 }
                 else {

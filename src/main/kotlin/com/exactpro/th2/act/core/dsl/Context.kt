@@ -33,72 +33,85 @@ import com.exactpro.th2.common.message.messageType
 import com.exactpro.th2.common.message.sessionAlias
 import io.grpc.Context
 import mu.KotlinLogging
-
+import java.util.concurrent.TimeUnit
+import java.util.logging.Logger
 
 private val LOGGER = KotlinLogging.logger {}
 class Context(
     private val handler: IRequestHandler,
     private val subscriptionManager: SubscriptionManager,
-    private var messageRouter: MessageRouter,
-    private var eventRouter: EventRouter,
+    messageRouter: MessageRouter,
+    eventRouter: EventRouter,
+    parentEventID: EventID
 ) {
 
     private var responder: Responder = Responder()
-    private lateinit var requestContext: RequestContext
+    private var requestContext: RequestContext
     private lateinit var request: Request
 
-    fun send(
-        message: Message,
-        sessionAlias: String,
-        direction: Direction = Direction.FIRST,
-        waitEcho: Boolean = false,
-        cleanBuffer: Boolean = true
-    ): Message { //TODO cleanBuffer
+    private val returnMessages = mutableListOf<Message>()
+    private val start = System.currentTimeMillis()
 
-        val requestMessageSubmitter = RequestMessageSubmitter()
-
+    init {
         requestContext = RequestContext(
             "",
             "",
             messageRouter,
             eventRouter,
-            message.parentEventId,
+            parentEventID,
             Checkpoint.getDefaultInstance(),
             Context.current()
         )
+    }
+
+    fun send(
+        message: Message,
+        sessionAlias: String,
+        waitEcho: Boolean = false,
+        timeout: Long = 10_000,
+        cleanBuffer: Boolean = false
+    ): Message {
+
+        val requestMessageSubmitter = RequestMessageSubmitter()
 
         request = Request(message)
 
         requestMessageSubmitter.handle(request, responder, requestContext)
 
+        if (cleanBuffer){
+            responder.cleanResponseMessages()
+        }
+
         if (waitEcho) {
-            val echo = receive(message.messageType, message.parentEventId, sessionAlias, Direction.SECOND) {
+            return receive(message.messageType, sessionAlias, Direction.SECOND, timeout) {
                 passOn(message.metadata.messageType) {
                     parentEventId == message.parentEventId
                 }
+                passOn(message.metadata.messageType) {
+                    parentEventId != message.parentEventId
+                }
             }
-            return echo
         }
+
         return message
     }
 
     fun receive(
         messageType: String,
-        eventID: EventID,
-
         sessionAlias: String,
+
         direction: Direction = Direction.SECOND,
+        timeout: Long,
         filter: ReceiveBuilder.() -> Boolean
     ): Message {
 
         val connectionID = ConnectionID.newBuilder().setSessionAlias(sessionAlias).build()
         val requestMessage = Message.newBuilder().apply {
             this.sessionAlias = sessionAlias
-            this.parentEventId = eventID
             this.messageType = messageType
         }.build()
 
-        val checkRule = CheckRule(connectionID) //TODO
+        val checkRule = CheckRule(connectionID, returnMessages)
 
         val receiverFactory = MessageReceiverFactory(
             subscriptionManager,
@@ -109,20 +122,24 @@ class Context(
         )
 
         val messageMapping =
-            listOf(MessageMapping(listOf(MessageType.getMessageType(messageType)!!), true, StatusMapping.PASSED))
+            listOf(MessageMapping(listOf(MessageType.getMessageType(messageType)!!), false, StatusMapping.PASSED))
         val responseProcessor = ResponseProcessor(messageMapping) { emptyList() }
 
-        val responseReceiver = SystemResponseReceiver(handler, receiverFactory, responseProcessor)
+        val responseReceiver = SystemResponseReceiver(handler, receiverFactory, responseProcessor, timeout)
         responseReceiver.handle(request, responder, requestContext)
 
-        val responseMessage = responder.responseMessages[0]
-
-        return if (ReceiveBuilder(responseMessage).filter()) { //TODO
-            responseMessage
+        val responseMessage = responder.getResponseMessages()
+        if (responseMessage.isNotEmpty()) {
+            responseMessage.forEach{
+                if (ReceiveBuilder(it).filter() && !returnMessages.contains(it)) {
+                    returnMessages.add(it)
+                    return it
+                }
+            }
         } else {
             LOGGER.debug("There were no messages matching this selection")
-            Message.getDefaultInstance()
         }
+        return Message.getDefaultInstance()
     }
 
     fun repeatUntil(msg: Message? = null, until: (Message) -> Boolean): ((Message) -> Boolean)? {
@@ -135,6 +152,7 @@ class Context(
         do {
             val message = func.invoke()
             if (messages.contains(message)) break
+            if (this != null && repeatUntil(message, this) == null) break
             messages.add(message)
         } while (this != null && repeatUntil(message, this) != null)
         return messages
@@ -152,7 +170,9 @@ enum class MessageType(private val typeName: String) : IMessageType {
     REJECT("Reject"),
     ORDER_CANCEL_REJECT("OrderCancelReject"),
     TRADE_CAPTURE_REPORT("TradeCaptureReport"),
-    TRADE_CAPTURE_REPORT_ACK("TradeCaptureReportAck");
+    TRADE_CAPTURE_REPORT_ACK("TradeCaptureReportAck"),
+    QUOTE_STATUS_REPORT("QuoteStatusReport"),
+    DQ126("DQ126");
 
     override fun getTypeName() = typeName
 

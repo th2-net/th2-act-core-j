@@ -21,23 +21,28 @@ import com.exactpro.th2.common.grpc.Checkpoint
 import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.grpc.RequestStatus
 
-class Responder : IResponder { //todo my class
-    var responseMessages = mutableListOf<Message>() //TODO
+class Responder : IResponder {
+    private var responseMessages = mutableListOf<Message>()
+    private var responseIsSent: Boolean = false
+    private  var sentStatus: RequestStatus.Status? = null
 
-    var responseIsSent: Boolean = false
-    var sentStatus: RequestStatus.Status? = null
-
-    override fun onError(cause: String) {//todo
+    override fun onError(cause: String) {
         sentStatus = RequestStatus.Status.ERROR
     }
 
-    override fun isResponseSent() = responseIsSent //todo
+    override fun isResponseSent() = responseIsSent
 
     override fun onResponseFound(
         status: RequestStatus.Status, checkpoint: Checkpoint, responses: List<Message>
     ) {
-        for (msg in responses) {
-            responseMessages.add(msg)
+        responses.forEach {
+            responseMessages.add(it)
         }
+    }
+
+    fun getResponseMessages(): List<Message> = responseMessages
+
+    fun cleanResponseMessages(){
+        responseMessages = mutableListOf()
     }
 }
