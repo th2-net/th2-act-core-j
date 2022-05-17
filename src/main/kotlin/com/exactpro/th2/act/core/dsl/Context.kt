@@ -20,49 +20,28 @@ import com.exactpro.th2.act.core.handlers.IRequestHandler
 import com.exactpro.th2.act.core.handlers.RequestMessageSubmitter
 import com.exactpro.th2.act.core.handlers.decorators.SystemResponseReceiver
 import com.exactpro.th2.act.core.managers.SubscriptionManager
-import com.exactpro.th2.act.core.messages.IMessageType
 import com.exactpro.th2.act.core.messages.MessageMapping
 import com.exactpro.th2.act.core.messages.StatusMapping
 import com.exactpro.th2.act.core.requests.Request
 import com.exactpro.th2.act.core.requests.RequestContext
+import com.exactpro.th2.act.core.response.NoResponseBodyFactory
 import com.exactpro.th2.act.core.response.ResponseProcessor
-import com.exactpro.th2.act.core.routers.EventRouter
-import com.exactpro.th2.act.core.routers.MessageRouter
-import com.exactpro.th2.common.grpc.*
+import com.exactpro.th2.common.grpc.ConnectionID
+import com.exactpro.th2.common.grpc.Direction
+import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.message.messageType
-import com.exactpro.th2.common.message.sessionAlias
-import io.grpc.Context
 import mu.KotlinLogging
-import java.util.concurrent.TimeUnit
-import java.util.logging.Logger
 
 private val LOGGER = KotlinLogging.logger {}
+
 class Context(
     private val handler: IRequestHandler,
     private val subscriptionManager: SubscriptionManager,
-    messageRouter: MessageRouter,
-    eventRouter: EventRouter,
-    parentEventID: EventID
+    private val requestContext: RequestContext
 ) {
 
     private var responder: Responder = Responder()
-    private var requestContext: RequestContext
     private lateinit var request: Request
-
-    private val returnMessages = mutableListOf<Message>()
-    private val start = System.currentTimeMillis()
-
-    init {
-        requestContext = RequestContext(
-            "",
-            "",
-            messageRouter,
-            eventRouter,
-            parentEventID,
-            Checkpoint.getDefaultInstance(),
-            Context.current()
-        )
-    }
 
     fun send(
         message: Message,
@@ -71,81 +50,53 @@ class Context(
         timeout: Long = 10_000,
         cleanBuffer: Boolean = false
     ): Message {
-
-        val requestMessageSubmitter = RequestMessageSubmitter()
-
         request = Request(message)
 
+        val requestMessageSubmitter = RequestMessageSubmitter()
         requestMessageSubmitter.handle(request, responder, requestContext)
 
-        if (cleanBuffer){
-            responder.cleanResponseMessages()
-        }
+        if (cleanBuffer) responder.cleanResponseMessages()
 
-        if (waitEcho) {
-            return receive(message.messageType, sessionAlias, Direction.SECOND, timeout) {
+        return if (waitEcho) {
+            receive(message.messageType, sessionAlias, Direction.SECOND, timeout) {
                 passOn(message.metadata.messageType) {
                     parentEventId == message.parentEventId
                 }
-                passOn(message.metadata.messageType) {
+                failOn(message.metadata.messageType) {
                     parentEventId != message.parentEventId
                 }
             }
-        }
-
-        return message
+        } else message
     }
 
     fun receive(
         messageType: String,
         sessionAlias: String,
-
         direction: Direction = Direction.SECOND,
         timeout: Long,
         filter: ReceiveBuilder.() -> Boolean
     ): Message {
-
         val connectionID = ConnectionID.newBuilder().setSessionAlias(sessionAlias).build()
-        val requestMessage = Message.newBuilder().apply {
-            this.sessionAlias = sessionAlias
-            this.messageType = messageType
-        }.build()
-
-        val checkRule = CheckRule(connectionID, returnMessages)
-
-        val receiverFactory = MessageReceiverFactory(
-            subscriptionManager,
-            connectionID,
-            requestMessage,
-            direction,
-            checkRule
-        )
-
-        val messageMapping =
-            listOf(MessageMapping(listOf(MessageType.getMessageType(messageType)!!), false, StatusMapping.PASSED))
-        val responseProcessor = ResponseProcessor(messageMapping) { emptyList() }
+        val checkRule = CheckRule(connectionID, responder.getResponseMessages())
+        val receiverFactory =
+            MessageReceiverFactory(subscriptionManager, connectionID, request.requestMessage, direction, checkRule)
+        val responseProcessor: ResponseProcessor = responseProcessor(MessageType.getMessageType(messageType))
 
         val responseReceiver = SystemResponseReceiver(handler, receiverFactory, responseProcessor, timeout)
         responseReceiver.handle(request, responder, requestContext)
 
-        val responseMessage = responder.getResponseMessages()
-        if (responseMessage.isNotEmpty()) {
-            responseMessage.forEach{
-                if (ReceiveBuilder(it).filter() && !returnMessages.contains(it)) {
-                    returnMessages.add(it)
-                    return it
-                }
-            }
-        } else {
-            LOGGER.debug("There were no messages matching this selection")
-        }
+        val lastIndex = responder.getResponseMessages().lastIndex
+        if (lastIndex >= 0) {
+            val responseMessage = responder.getResponseMessages()[lastIndex]
+            if (ReceiveBuilder(responseMessage).filter()) return responseMessage
+        } else LOGGER.debug("There were no messages matching this selection")
+
         return Message.getDefaultInstance()
     }
 
-    fun repeatUntil(msg: Message? = null, until: (Message) -> Boolean): ((Message) -> Boolean)? {
-        if (msg == null || until.invoke(msg)) return until
-        return null
-    }
+    fun repeatUntil(msg: Message? = null, until: (Message) -> Boolean): ((Message) -> Boolean)? =
+        if (msg == null || until.invoke(msg)) until
+        else null
 
     infix fun ((Message) -> Boolean)?.`do`(func: () -> Message): List<Message> {
         val messages = mutableListOf<Message>()
@@ -157,29 +108,16 @@ class Context(
         } while (this != null && repeatUntil(message, this) != null)
         return messages
     }
-}
 
-
-enum class MessageType(private val typeName: String) : IMessageType {
-
-    NEW_ORDER_SINGLE("NewOrderSingle"),
-    ORDER_CANCEL_REPLACE_REQUEST("OrderCancelReplaceRequest"),
-    ORDER_CANCEL_REQUEST("OrderCancelRequest"),
-    EXECUTION_REPORT("ExecutionReport"),
-    BUSINESS_MESSAGE_REJECT("BusinessMessageReject"),
-    REJECT("Reject"),
-    ORDER_CANCEL_REJECT("OrderCancelReject"),
-    TRADE_CAPTURE_REPORT("TradeCaptureReport"),
-    TRADE_CAPTURE_REPORT_ACK("TradeCaptureReportAck"),
-    QUOTE_STATUS_REPORT("QuoteStatusReport"),
-    DQ126("DQ126");
-
-    override fun getTypeName() = typeName
-
-    companion object {
-        fun getMessageType(typeName: String): MessageType? {
-            return values().find { it.typeName == typeName }
+    private val responseProcessor: (MessageType?) -> ResponseProcessor = { msgType ->
+        val messageTypes = mutableListOf<MessageType>()
+        val noResponseBodyFactory = null
+        if (msgType != null) {
+            messageTypes.add(msgType)
+            NoResponseBodyFactory(msgType)
+        }
+        ResponseProcessor(listOf(MessageMapping(messageTypes, false, StatusMapping.PASSED))) {
+            noResponseBodyFactory ?: emptyList()
         }
     }
 }
-

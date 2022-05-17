@@ -18,8 +18,10 @@ package com.exactpro.th2.act.core.dsl
 
 import com.exactpro.th2.act.core.handlers.IRequestHandler
 import com.exactpro.th2.act.core.managers.SubscriptionManager
+import com.exactpro.th2.act.core.requests.RequestContext
 import com.exactpro.th2.act.core.routers.EventRouter
 import com.exactpro.th2.act.core.routers.MessageRouter
+import com.exactpro.th2.common.grpc.Checkpoint
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.Message
@@ -27,65 +29,104 @@ import com.exactpro.th2.common.message.direction
 import com.exactpro.th2.common.message.sessionAlias
 
 fun context(
+    rpcName: String,
+    requestName: String,
     handler: IRequestHandler,
     messageRouter: MessageRouter,
     eventRouter: EventRouter,
     parentEventID: EventID
-): Context {
-    val subscriptionManager = SubscriptionManager()
-    return Context(handler, subscriptionManager, messageRouter, eventRouter, parentEventID)
-}
+): Context = Context(
+    handler,
+    SubscriptionManager(),
+    RequestContext(
+        rpcName,
+        requestName,
+        messageRouter,
+        eventRouter,
+        parentEventID,
+        Checkpoint.getDefaultInstance(),
+        io.grpc.Context.current()
+    )
+)
 
 fun context(
     handler: IRequestHandler,
+    rpcName: String,
+    requestName: String,
     messageRouter: MessageRouter,
     eventRouter: EventRouter,
     parentEventID: EventID,
     preFilter: ((Message) -> Boolean)
-): Context {
-
-    val subscriptionManager = subscriptionManager(preFilter)
-    return Context(handler, subscriptionManager, messageRouter, eventRouter, parentEventID)
-}
+): Context = Context(
+    handler,
+    subscriptionManager(preFilter),
+    RequestContext(
+        rpcName,
+        requestName,
+        messageRouter,
+        eventRouter,
+        parentEventID,
+        Checkpoint.getDefaultInstance(),
+        io.grpc.Context.current()
+    )
+)
 
 fun context(
     handler: IRequestHandler,
+    rpcName: String,
+    requestName: String,
     messageRouter: MessageRouter,
     eventRouter: EventRouter,
     parentEventID: EventID,
     connectivity: Map<String, Direction>
-): Context {
-
-    val sessionAliasList = listOf<String>().plus(connectivity.keys.toTypedArray())
-    val directionList = listOf<Direction>().plus(connectivity.values.toTypedArray())
-    val subscriptionManager = subscriptionManager(sessionAliasList, directionList)
-
-    return Context(handler, subscriptionManager, messageRouter, eventRouter, parentEventID)
-}
+): Context = Context(
+    handler,
+    subscriptionManager(
+        listOf<String>().plus(connectivity.keys.toTypedArray()),
+        listOf<Direction>().plus(connectivity.values.toTypedArray())
+    ),
+    RequestContext(
+        rpcName,
+        requestName,
+        messageRouter,
+        eventRouter,
+        parentEventID,
+        Checkpoint.getDefaultInstance(),
+        io.grpc.Context.current()
+    )
+)
 
 fun context(
     handler: IRequestHandler,
+    rpcName: String,
+    requestName: String,
     messageRouter: MessageRouter,
     eventRouter: EventRouter,
     parentEventID: EventID,
     sessionAlias: String,
     direction: Direction,
     anotherSessionAlias: String
-): Context {
-    val sessionAliasList = listOf(sessionAlias, anotherSessionAlias)
-    val directionList = listOf(direction)
-    val subscriptionManager = subscriptionManager(sessionAliasList, directionList)
-    return Context(handler, subscriptionManager, messageRouter, eventRouter, parentEventID)
-}
+): Context = Context(
+    handler,
+    subscriptionManager(listOf(sessionAlias, anotherSessionAlias), listOf(direction)),
+    RequestContext(
+        rpcName,
+        requestName,
+        messageRouter,
+        eventRouter,
+        parentEventID,
+        Checkpoint.getDefaultInstance(),
+        io.grpc.Context.current()
+    )
+)
 
 infix fun Context.`do`(action: Context.() -> Unit) {
     action.invoke(this)
 }
 
-fun subscriptionManager(sessionAliasList: List<String>, directionList: List<Direction>): SubscriptionManager{
-    return SubscriptionManager {msg: Message -> sessionAliasList.contains(msg.sessionAlias) && directionList.contains(msg.direction)}
-}
+fun subscriptionManager(sessionAliasList: List<String>, directionList: List<Direction>): SubscriptionManager =
+    SubscriptionManager { msg: Message ->
+        sessionAliasList.contains(msg.sessionAlias) && directionList.contains(msg.direction)
+    }
 
-fun subscriptionManager(preFilter: ((Message) -> Boolean)): SubscriptionManager{
-    return SubscriptionManager(preFilter)
-}
+fun subscriptionManager(preFilter: ((Message) -> Boolean)): SubscriptionManager = SubscriptionManager(preFilter)

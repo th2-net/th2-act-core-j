@@ -18,27 +18,23 @@ package com.exactpro.th2.act.core.dsl
 
 import com.exactpro.th2.common.grpc.Message
 
+
+enum class StatusReceiveBuilder(val value: Boolean) {
+    PASSED(true),
+    FAILED(false)
+}
+
 class ReceiveBuilder(private val message: Message) {
-    enum class Status { PASSED, FAILED }
 
-    private val fail = Status.FAILED
-    private val pass = Status.PASSED
+    private val fail = StatusReceiveBuilder.FAILED
+    private val pass = StatusReceiveBuilder.PASSED
 
-    private var status: Boolean = false
+    fun passOn(msgType: String, filter: Message.() -> Boolean): Boolean = pass.on(msgType, filter)
 
-    fun passOn(msgType: String, filter: Message.() -> Boolean): Boolean {
-        return pass.on(msgType, filter)
-    }
+    fun failOn(msgType: String, filter: Message.() -> Boolean): Boolean = fail.on(msgType, filter)
 
-    fun failOn(msgType: String, filter: Message.() -> Boolean): Boolean {
-        return fail.on(msgType, filter)
-    }
-
-    fun Status.on(msgType: String, filter: Message.() -> Boolean): Boolean{
-        if(message.metadata.messageType == msgType && filter.invoke(message)){
-            if (this == pass) status = true
-            if (this == fail && !status) status = false
-        }
-        return status
+    fun StatusReceiveBuilder.on(msgType: String, filter: Message.() -> Boolean): Boolean {
+        return if (message.metadata.messageType == msgType && filter.invoke(message)) this.value
+        else !this.value
     }
 }
