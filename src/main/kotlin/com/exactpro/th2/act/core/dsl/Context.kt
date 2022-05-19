@@ -30,26 +30,34 @@ import com.exactpro.th2.common.grpc.ConnectionID
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.message.messageType
+import io.grpc.Deadline
+import io.grpc.Status
 import mu.KotlinLogging
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+
 
 private val LOGGER = KotlinLogging.logger {}
 
 class Context(
     private val handler: IRequestHandler,
     private val subscriptionManager: SubscriptionManager,
-    private val requestContext: RequestContext
+    private val requestContext: RequestContext,
+    private val timeout: Long
 ) {
-
     private var responder: Responder = Responder()
     private lateinit var request: Request
+    private val context = io.grpc.Context.current()
+    private var blockingStub = context.withDeadlineAfter(timeout, TimeUnit.MILLISECONDS, Executors.newSingleThreadScheduledExecutor())
 
     fun send(
         message: Message,
         sessionAlias: String,
         waitEcho: Boolean = false,
-        timeout: Long = 10_000,
         cleanBuffer: Boolean = false
     ): Message {
+        checkingContext()
+
         request = Request(message)
 
         val requestMessageSubmitter = RequestMessageSubmitter()
@@ -58,7 +66,7 @@ class Context(
         if (cleanBuffer) responder.cleanResponseMessages()
 
         return if (waitEcho) {
-            receive(message.messageType, sessionAlias, Direction.SECOND, timeout) {
+            receive(message.messageType, sessionAlias, Direction.SECOND) {
                 passOn(message.metadata.messageType) {
                     parentEventId == message.parentEventId
                 }
@@ -73,16 +81,20 @@ class Context(
         messageType: String,
         sessionAlias: String,
         direction: Direction = Direction.SECOND,
-        timeout: Long,
         filter: ReceiveBuilder.() -> Boolean
     ): Message {
+        checkingContext()
+
         val connectionID = ConnectionID.newBuilder().setSessionAlias(sessionAlias).build()
         val checkRule = CheckRule(connectionID, responder.getResponseMessages())
         val receiverFactory =
             MessageReceiverFactory(subscriptionManager, connectionID, request.requestMessage, direction, checkRule)
         val responseProcessor: ResponseProcessor = responseProcessor(MessageType.getMessageType(messageType))
 
-        val responseReceiver = SystemResponseReceiver(handler, receiverFactory, responseProcessor, timeout)
+        val responseReceiver = SystemResponseReceiver(
+            handler, receiverFactory, responseProcessor,
+            getDeadline().timeRemaining(TimeUnit.MILLISECONDS)
+        )
         responseReceiver.handle(request, responder, requestContext)
 
         val lastIndex = responder.getResponseMessages().lastIndex
@@ -106,6 +118,7 @@ class Context(
             if (this != null && repeatUntil(message, this) == null) break
             messages.add(message)
         } while (this != null && repeatUntil(message, this) != null)
+
         return messages
     }
 
@@ -119,5 +132,20 @@ class Context(
         ResponseProcessor(listOf(MessageMapping(messageTypes, false, StatusMapping.PASSED))) {
             noResponseBodyFactory ?: emptyList()
         }
+    }
+
+    private fun checkingContext(){
+        if (context.isCancelled) {
+            Status.CANCELLED.withDescription("Cancelled by client").asRuntimeException()
+        }
+        if (getDeadline().isExpired) {
+            throw Exception("timeout = $timeout ended before context execution was completed")
+        }
+    }
+
+    private fun getDeadline(): Deadline{
+        val deadline = blockingStub.deadline
+        if (deadline != null) return deadline
+        else throw Exception("deadline must not be null")
     }
 }

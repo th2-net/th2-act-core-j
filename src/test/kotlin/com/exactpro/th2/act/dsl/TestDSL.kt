@@ -35,7 +35,7 @@ import com.exactpro.th2.common.message.getField
 import com.exactpro.th2.common.message.sequence
 import com.exactpro.th2.common.message.sessionAlias
 import io.mockk.spyk
-import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
@@ -94,8 +94,8 @@ class TestDSL {
             messages.forEach { subscriptionManager.handler(randomString(), it.toBatch()) }
         }
 
-        Context(handler, subscriptionManager, requestContext) `do` {
-            assertEquals(messages[1], send(messages[0], "sessionAlias", true, 2_000))
+        Context(handler, subscriptionManager, requestContext, 2_000) `do` {
+            assertEquals(messages[1], send(messages[0], "sessionAlias", true))
         }
     }
 
@@ -113,11 +113,11 @@ class TestDSL {
             messages.forEach { subscriptionManager.handler(randomString(), it.toBatch()) }
         }
 
-        Context(handler, subscriptionManager, requestContext) `do` {
+        Context(handler, subscriptionManager, requestContext, 2_000) `do` {
             send(messages[0], "sessionAlias")
             assertEquals(
                 messages[0],
-                receive(TestMessageType.NEW_ORDER_SINGLE.typeName, "sessionAlias", Direction.FIRST, 2_000) {
+                receive(TestMessageType.NEW_ORDER_SINGLE.typeName, "sessionAlias", Direction.FIRST) {
                     passOn(TestMessageType.NEW_ORDER_SINGLE.typeName) {
                         sequence == 1L
                     }
@@ -126,6 +126,30 @@ class TestDSL {
                     }
                 })
         }
+    }
+
+    @Test
+    fun `test deadline`() {
+        val timeout: Long = 1
+        val exception = assertThrows(Exception::class.java) {
+            Context(handler, SubscriptionManager(), requestContext, timeout) `do` {
+                send(
+                    messageBuild(
+                        TestMessageType.NEW_ORDER_SINGLE.typeName,
+                        "sessionAlias",
+                        Direction.FIRST,
+                        2L
+                    ).build(),
+                    "sessionAlias"
+                )
+
+                receive(TestMessageType.NEW_ORDER_SINGLE.typeName, "sessionAlias", Direction.FIRST) {
+                    passOn(TestMessageType.NEW_ORDER_SINGLE.typeName) { this.sequence == 1L }
+                    failOn(TestMessageType.NEW_ORDER_SINGLE.typeName) { this.sequence == 2L }
+                }
+            }
+        }
+        assertEquals("timeout = $timeout ended before context execution was completed", exception.message)
     }
 
     @Test
@@ -154,7 +178,7 @@ class TestDSL {
             messages.forEach { subscriptionManager.handler(randomString(), it.toBatch()) }
         }
 
-        Context(handler, subscriptionManager, requestContext) `do` {
+        Context(handler, subscriptionManager, requestContext, 2_000) `do` {
             val quote: Message = send(
                 messageBuild(
                     TestMessageType.QUOTE_STATUS_REPORT.typeName,
@@ -166,7 +190,7 @@ class TestDSL {
             )
 
             val quoteStatusReportOne =
-                receive(TestMessageType.QUOTE_STATUS_REPORT.typeName, "anotherSessionAlias", Direction.FIRST, 2_000) {
+                receive(TestMessageType.QUOTE_STATUS_REPORT.typeName, "anotherSessionAlias", Direction.FIRST) {
                     passOn(TestMessageType.QUOTE_STATUS_REPORT.typeName) {
                         this.getField("quoteId") == quote.getField("quoteId")
                                 && this.getField("quoteStatus") == Value.newBuilder().setSimpleValue("Accepted").build()
@@ -184,8 +208,7 @@ class TestDSL {
                     receive(
                         TestMessageType.QUOTE_STATUS_REPORT.typeName,
                         "anotherSessionAlias",
-                        Direction.FIRST,
-                        2_000
+                        Direction.FIRST
                     ) {
                         passOn(TestMessageType.QUOTE_STATUS_REPORT.typeName) {
                             this.getField("quoteId") == quote.getField("quoteId")
@@ -227,7 +250,7 @@ class TestDSL {
             messages.forEach { subscriptionManager.handler(randomString(), it.toBatch()) }
         }
 
-        Context(handler, subscriptionManager, requestContext) `do` {
+        Context(handler, subscriptionManager, requestContext, 2_000) `do` {
             send(
                 messageBuild(TestMessageType.NEW_ORDER_SINGLE.typeName, "sessionAlias", Direction.FIRST, 4L).build(),
                 "sessionAlias"
@@ -236,7 +259,7 @@ class TestDSL {
             resultBuilder.setListMessages(repeatUntil { mes ->
                 mes.sequence != 1L
             } `do` {
-                receive(TestMessageType.NEW_ORDER_SINGLE.typeName, "sessionAlias", Direction.FIRST, 2_000) {
+                receive(TestMessageType.NEW_ORDER_SINGLE.typeName, "sessionAlias", Direction.FIRST) {
                     passOn(TestMessageType.NEW_ORDER_SINGLE.typeName) {
                         direction == Direction.FIRST
                     }
@@ -269,13 +292,13 @@ class TestDSL {
             subscriptionManager.handler(randomString(), updateDQ126(createDQ126(), segmentNum.toString()).toBatch())
         }
 
-        Context(handler, subscriptionManager, requestContext) `do` {
+        Context(handler, subscriptionManager, requestContext, 2_000) `do` {
             val listMessagesDQ126 = ArrayList<Message>()
             var messageDQ126 = createDQ126()
             do {
                 send(messageDQ126, "sessionAlias")
 
-                val responseDQ126 = receive(TestMessageType.DQ126.typeName, "sessionAlias", Direction.FIRST, 2_000) {
+                val responseDQ126 = receive(TestMessageType.DQ126.typeName, "sessionAlias", Direction.FIRST) {
                     passOn(TestMessageType.DQ126.typeName) {
                         this.sequence <= 4L
                     }
@@ -336,12 +359,12 @@ class TestDSL {
 
         handler respondsWith { messages.forEach { subscriptionManager.handler(randomString(), it.toBatch()) } }
 
-        Context(handler, subscriptionManager, requestContext) `do` {
+        Context(handler, subscriptionManager, requestContext, 2_000) `do` {
             val echoMessage: Message = send(messages[0], "sessionAlias", true)
             assertEquals(messages[1], echoMessage)
 
             resultBuilder.setSingleMessage(
-                receive(TestMessageType.BUSINESS_MESSAGE_REJECT.typeName, "sessionAlias", Direction.FIRST, 2_000) {
+                receive(TestMessageType.BUSINESS_MESSAGE_REJECT.typeName, "sessionAlias", Direction.FIRST) {
                     passOn(TestMessageType.BUSINESS_MESSAGE_REJECT.typeName) { this.sequence == 1L }
                     failOn(TestMessageType.BUSINESS_MESSAGE_REJECT.typeName) { this.sequence == 2L }
                 }
@@ -363,11 +386,11 @@ class TestDSL {
 
         handler respondsWith { subscriptionManager.handler(randomString(), messages[0].toBatch()) }
 
-        Context(handler, subscriptionManager, requestContext) `do` {
+        Context(handler, subscriptionManager, requestContext, 2_000) `do` {
             send(messages[0], "sessionAlias")
 
             resultBuilder.setSingleMessage(
-                receive(TestMessageType.ORDER_CANCEL_REJECT.typeName, "sessionAlias", Direction.FIRST, 2_000) {
+                receive(TestMessageType.ORDER_CANCEL_REJECT.typeName, "sessionAlias", Direction.FIRST) {
                     passOn(TestMessageType.ORDER_CANCEL_REJECT.typeName) { this.sequence == 1L }
                     failOn(TestMessageType.ORDER_CANCEL_REJECT.typeName) { this.sequence == 2L }
                 }
@@ -378,7 +401,7 @@ class TestDSL {
             handler respondsWith { subscriptionManager.handler(randomString(), messages[1].toBatch()) }
 
             resultBuilder.setSingleMessage(
-                receive(TestMessageType.NEW_ORDER_SINGLE.typeName, "sessionAlias", Direction.FIRST, 2_000) {
+                receive(TestMessageType.NEW_ORDER_SINGLE.typeName, "sessionAlias", Direction.FIRST) {
                     passOn(TestMessageType.NEW_ORDER_SINGLE.typeName) { this.sequence == 2L }
                     failOn(TestMessageType.NEW_ORDER_SINGLE.typeName) { this.sequence == 1L }
                 }

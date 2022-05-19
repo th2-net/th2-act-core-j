@@ -34,7 +34,8 @@ fun context(
     handler: IRequestHandler,
     messageRouter: MessageRouter,
     eventRouter: EventRouter,
-    parentEventID: EventID
+    parentEventID: EventID,
+    timeout: Long,
 ): Context = Context(
     handler,
     SubscriptionManager(),
@@ -46,7 +47,8 @@ fun context(
         parentEventID,
         Checkpoint.getDefaultInstance(),
         io.grpc.Context.current()
-    )
+    ),
+    timeout
 )
 
 fun context(
@@ -56,6 +58,7 @@ fun context(
     messageRouter: MessageRouter,
     eventRouter: EventRouter,
     parentEventID: EventID,
+    timeout: Long,
     preFilter: ((Message) -> Boolean)
 ): Context = Context(
     handler,
@@ -68,7 +71,8 @@ fun context(
         parentEventID,
         Checkpoint.getDefaultInstance(),
         io.grpc.Context.current()
-    )
+    ),
+    timeout
 )
 
 fun context(
@@ -78,6 +82,7 @@ fun context(
     messageRouter: MessageRouter,
     eventRouter: EventRouter,
     parentEventID: EventID,
+    timeout: Long,
     connectivity: Map<String, Direction>
 ): Context = Context(
     handler,
@@ -93,7 +98,8 @@ fun context(
         parentEventID,
         Checkpoint.getDefaultInstance(),
         io.grpc.Context.current()
-    )
+    ),
+    timeout
 )
 
 fun context(
@@ -103,6 +109,7 @@ fun context(
     messageRouter: MessageRouter,
     eventRouter: EventRouter,
     parentEventID: EventID,
+    timeout: Long,
     sessionAlias: String,
     direction: Direction,
     anotherSessionAlias: String
@@ -117,7 +124,8 @@ fun context(
         parentEventID,
         Checkpoint.getDefaultInstance(),
         io.grpc.Context.current()
-    )
+    ),
+    timeout
 )
 
 infix fun Context.`do`(action: Context.() -> Unit) {
