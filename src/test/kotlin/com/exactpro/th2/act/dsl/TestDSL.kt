@@ -17,13 +17,11 @@
 package com.exactpro.th2.act.dsl
 
 import com.exactpro.th2.act.TestMessageType
-import com.exactpro.th2.act.core.dsl.Context
 import com.exactpro.th2.act.core.dsl.ReceiveBuilder
 import com.exactpro.th2.act.core.dsl.`do`
-import com.exactpro.th2.act.core.dsl.subscriptionManager
+import com.exactpro.th2.act.core.dsl.context
 import com.exactpro.th2.act.core.handlers.decorators.TestSystemResponseReceiver
 import com.exactpro.th2.act.core.managers.SubscriptionManager
-import com.exactpro.th2.act.core.requests.RequestContext
 import com.exactpro.th2.act.core.routers.EventRouter
 import com.exactpro.th2.act.core.routers.MessageRouter
 import com.exactpro.th2.act.randomString
@@ -35,18 +33,19 @@ import com.exactpro.th2.common.message.getField
 import com.exactpro.th2.common.message.sequence
 import com.exactpro.th2.common.message.sessionAlias
 import io.mockk.spyk
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
 class TestDSL {
 
-    private lateinit var subscriptionManager: SubscriptionManager
+    private lateinit var handler: TestSystemResponseReceiver.StubRequestHandler
     private lateinit var messageRouter: MessageRouter
     private lateinit var eventRouter: EventRouter
-    private lateinit var handler: TestSystemResponseReceiver.StubRequestHandler
     private val parentEventID: EventID = EventID.newBuilder().setId("eventId").build()
-    private lateinit var requestContext: RequestContext
+    private val rpcName: String = randomString()
+    private val requestName: String = randomString()
 
     @BeforeEach
     internal fun setUp() {
@@ -55,15 +54,6 @@ class TestDSL {
         messageRouter = MessageRouter(messageBatchRouter)
         val eventBatchRouter: StubMessageRouter<EventBatch> = StubMessageRouter()
         eventRouter = EventRouter(eventBatchRouter)
-        requestContext = RequestContext(
-            randomString(),
-            randomString(),
-            messageRouter,
-            eventRouter,
-            parentEventID,
-            Checkpoint.getDefaultInstance(),
-            io.grpc.Context.current()
-        )
     }
 
     private fun messageBuild(
@@ -89,12 +79,24 @@ class TestDSL {
             messageBuild(TestMessageType.NEW_ORDER_SINGLE.typeName, "sessionAlias", Direction.SECOND, 2L).build()
         )
 
-        subscriptionManager = subscriptionManager(listOf("sessionAlias"), listOf(Direction.FIRST, Direction.SECOND))
+        val subscriptionManager = SubscriptionManager()
         handler respondsWith {
             messages.forEach { subscriptionManager.handler(randomString(), it.toBatch()) }
         }
 
-        Context(handler, subscriptionManager, requestContext, 2_000) `do` {
+        context(
+            handler,
+            subscriptionManager,
+            rpcName,
+            requestName,
+            messageRouter,
+            eventRouter,
+            parentEventID,
+            2_000
+        ) { msg ->
+            msg.sessionAlias == "sessionAlias" &&
+                    (msg.direction == Direction.FIRST || msg.direction == Direction.SECOND)
+        } `do` {
             assertEquals(messages[1], send(messages[0], "sessionAlias", true))
         }
     }
@@ -106,14 +108,24 @@ class TestDSL {
             messageBuild(TestMessageType.NEW_ORDER_SINGLE.typeName, "sessionAlias", Direction.FIRST, 2).build()
         )
 
-        subscriptionManager =
-            subscriptionManager(listOf("sessionAlias", "anotherSessionAlias"), listOf(Direction.FIRST))
-
+        val subscriptionManager = SubscriptionManager()
         handler respondsWith {
             messages.forEach { subscriptionManager.handler(randomString(), it.toBatch()) }
         }
 
-        Context(handler, subscriptionManager, requestContext, 2_000) `do` {
+        context(
+            handler,
+            subscriptionManager,
+            rpcName,
+            requestName,
+            messageRouter,
+            eventRouter,
+            parentEventID,
+            2_000
+        ) { msg ->
+            msg.direction == Direction.FIRST &&
+                    (msg.sessionAlias == "sessionAlias" || msg.sessionAlias == "anotherSessionAlias")
+        } `do` {
             send(messages[0], "sessionAlias")
             assertEquals(
                 messages[0],
@@ -132,7 +144,16 @@ class TestDSL {
     fun `test deadline`() {
         val timeout: Long = 1
         val exception = assertThrows(Exception::class.java) {
-            Context(handler, SubscriptionManager(), requestContext, timeout) `do` {
+            context(
+                handler,
+                SubscriptionManager(),
+                rpcName,
+                requestName,
+                messageRouter,
+                eventRouter,
+                parentEventID,
+                timeout
+            ) `do` {
                 send(
                     messageBuild(
                         TestMessageType.NEW_ORDER_SINGLE.typeName,
@@ -171,14 +192,23 @@ class TestDSL {
             )
             sequence += 1L
         }
-
-        subscriptionManager = subscriptionManager(listOf("anotherSessionAlias"), listOf(Direction.FIRST))
-
+        val subscriptionManager = SubscriptionManager()
         handler respondsWith {
             messages.forEach { subscriptionManager.handler(randomString(), it.toBatch()) }
         }
 
-        Context(handler, subscriptionManager, requestContext, 2_000) `do` {
+        context(
+            handler,
+            subscriptionManager,
+            rpcName,
+            requestName,
+            messageRouter,
+            eventRouter,
+            parentEventID,
+            2_000
+        ) { msg ->
+            msg.direction == Direction.FIRST && msg.sessionAlias == "anotherSessionAlias"
+        } `do` {
             val quote: Message = send(
                 messageBuild(
                     TestMessageType.QUOTE_STATUS_REPORT.typeName,
@@ -201,11 +231,12 @@ class TestDSL {
                     }
                 }
 
-            resultBuilder.setSingleMessage(quoteStatusReportOne)
+            if (quoteStatusReportOne != null) {
+                resultBuilder.setSingleMessage(quoteStatusReportOne)
 
-            if (quoteStatusReportOne.sequence == 1L) {
-                resultBuilder.setSingleMessage(
-                    receive(
+                if (quoteStatusReportOne.sequence == 1L) {
+
+                    val quoteStatusReportTwo = receive(
                         TestMessageType.QUOTE_STATUS_REPORT.typeName,
                         "anotherSessionAlias",
                         Direction.FIRST
@@ -220,7 +251,9 @@ class TestDSL {
                                     && this.getField("quoteStatus") ==
                                     Value.newBuilder().setSimpleValue("Rejected").build()
                         }
-                    })
+                    }
+                    if (quoteStatusReportTwo != null) resultBuilder.setSingleMessage(quoteStatusReportTwo)
+                }
             }
         }
 
@@ -244,30 +277,41 @@ class TestDSL {
             )
         }
 
-        subscriptionManager = subscriptionManager(listOf("sessionAlias"), listOf(Direction.FIRST))
-
+        val subscriptionManager = SubscriptionManager()
         handler respondsWith {
             messages.forEach { subscriptionManager.handler(randomString(), it.toBatch()) }
         }
 
-        Context(handler, subscriptionManager, requestContext, 2_000) `do` {
+        context(
+            handler,
+            subscriptionManager,
+            rpcName,
+            requestName,
+            messageRouter,
+            eventRouter,
+            parentEventID,
+            2_000
+        ) { msg ->
+            msg.direction == Direction.FIRST && msg.sessionAlias == "sessionAlias"
+        } `do` {
             send(
                 messageBuild(TestMessageType.NEW_ORDER_SINGLE.typeName, "sessionAlias", Direction.FIRST, 4L).build(),
                 "sessionAlias"
             )
 
-            resultBuilder.setListMessages(repeatUntil { mes ->
-                mes.sequence != 1L
-            } `do` {
-                receive(TestMessageType.NEW_ORDER_SINGLE.typeName, "sessionAlias", Direction.FIRST) {
-                    passOn(TestMessageType.NEW_ORDER_SINGLE.typeName) {
-                        direction == Direction.FIRST
-                    }
-                    failOn(TestMessageType.NEW_ORDER_SINGLE.typeName) {
-                        direction == Direction.SECOND
-                    }
-                }
-            })
+            resultBuilder.setListMessages(
+                repeat {
+                    receive(TestMessageType.NEW_ORDER_SINGLE.typeName, "sessionAlias", Direction.FIRST) {
+                        passOn(TestMessageType.NEW_ORDER_SINGLE.typeName) {
+                            direction == Direction.FIRST
+                        }
+                        failOn(TestMessageType.NEW_ORDER_SINGLE.typeName) {
+                            direction == Direction.SECOND
+                        }
+                    }!!
+                } until { mes ->
+                    mes.sequence != 1L
+                })
             assertEquals(2, resultBuilder.getMessages().size)
             assertEquals(messages[0], resultBuilder.getMessage(0))
             assertEquals(messages[1], resultBuilder.getMessage(1))
@@ -285,14 +329,24 @@ class TestDSL {
             expectedMessages.add(updateDQ126(createDQ126(), it.toString()))
         }
 
-        subscriptionManager =
-            subscriptionManager(listOf("sessionAlias", "anotherSessionAlias"), listOf(Direction.FIRST))
-
+        val subscriptionManager = SubscriptionManager()
         handler respondsWith {
             subscriptionManager.handler(randomString(), updateDQ126(createDQ126(), segmentNum.toString()).toBatch())
         }
 
-        Context(handler, subscriptionManager, requestContext, 2_000) `do` {
+        context(
+            handler,
+            subscriptionManager,
+            rpcName,
+            requestName,
+            messageRouter,
+            eventRouter,
+            parentEventID,
+            2_000
+        ) { msg ->
+            msg.direction == Direction.FIRST &&
+                    (msg.sessionAlias == "sessionAlias" || msg.sessionAlias == "anotherSessionAlias")
+        } `do` {
             val listMessagesDQ126 = ArrayList<Message>()
             var messageDQ126 = createDQ126()
             do {
@@ -306,19 +360,21 @@ class TestDSL {
                         this.sequence > 4L
                     }
                 }
-                listMessagesDQ126.add(responseDQ126)
-                val segment: String = responseDQ126.fieldsMap["segment_number"]!!.simpleValue
-                if (segment.toInt() == 0) break
-                else messageDQ126 = updateDQ126(messageDQ126, segment)
+                var segment = "0"
+                if (responseDQ126 != null) {
+                    listMessagesDQ126.add(responseDQ126)
+                    segment = responseDQ126.fieldsMap["segment_number"]!!.simpleValue
+                    if (segment.toInt() == 0) break
+                    else messageDQ126 = updateDQ126(messageDQ126, segment)
 
-                segmentNum--
-                handler respondsWith {
-                    subscriptionManager.handler(
-                        randomString(),
-                        updateDQ126(createDQ126(), segmentNum.toString()).toBatch()
-                    )
+                    segmentNum--
+                    handler respondsWith {
+                        subscriptionManager.handler(
+                            randomString(),
+                            updateDQ126(createDQ126(), segmentNum.toString()).toBatch()
+                        )
+                    }
                 }
-
             } while (segment.toInt() > 0)
             resultBuilder.setListMessages(listMessagesDQ126)
         }
@@ -355,20 +411,31 @@ class TestDSL {
             messageBuild(TestMessageType.BUSINESS_MESSAGE_REJECT.typeName, "sessionAlias", Direction.SECOND, 2L).build()
         )
 
-        subscriptionManager = subscriptionManager(listOf("sessionAlias"), listOf(Direction.FIRST, Direction.SECOND))
-
+        val subscriptionManager = SubscriptionManager()
         handler respondsWith { messages.forEach { subscriptionManager.handler(randomString(), it.toBatch()) } }
 
-        Context(handler, subscriptionManager, requestContext, 2_000) `do` {
+        context(
+            handler,
+            subscriptionManager,
+            rpcName,
+            requestName,
+            messageRouter,
+            eventRouter,
+            parentEventID,
+            2_000
+        ) { msg ->
+            msg.sessionAlias == "sessionAlias" &&
+                    (msg.direction == Direction.FIRST || msg.direction == Direction.SECOND)
+        } `do` {
             val echoMessage: Message = send(messages[0], "sessionAlias", true)
             assertEquals(messages[1], echoMessage)
 
-            resultBuilder.setSingleMessage(
-                receive(TestMessageType.BUSINESS_MESSAGE_REJECT.typeName, "sessionAlias", Direction.FIRST) {
-                    passOn(TestMessageType.BUSINESS_MESSAGE_REJECT.typeName) { this.sequence == 1L }
-                    failOn(TestMessageType.BUSINESS_MESSAGE_REJECT.typeName) { this.sequence == 2L }
-                }
-            )
+
+            val message = receive(TestMessageType.BUSINESS_MESSAGE_REJECT.typeName, "sessionAlias", Direction.FIRST) {
+                passOn(TestMessageType.BUSINESS_MESSAGE_REJECT.typeName) { this.sequence == 1L }
+                failOn(TestMessageType.BUSINESS_MESSAGE_REJECT.typeName) { this.sequence == 2L }
+            }
+            if (message != null) resultBuilder.setSingleMessage(message)
         }
         assertEquals(messages[0], resultBuilder.getMessage(0))
     }
@@ -382,30 +449,40 @@ class TestDSL {
             messageBuild(TestMessageType.NEW_ORDER_SINGLE.typeName, "sessionAlias", Direction.FIRST, 2L).build()
         )
 
-        subscriptionManager = subscriptionManager(listOf("sessionAlias"), listOf(Direction.FIRST))
-
+        val subscriptionManager = SubscriptionManager()
         handler respondsWith { subscriptionManager.handler(randomString(), messages[0].toBatch()) }
 
-        Context(handler, subscriptionManager, requestContext, 2_000) `do` {
+        context(
+            handler,
+            subscriptionManager,
+            rpcName,
+            requestName,
+            messageRouter,
+            eventRouter,
+            parentEventID,
+            2_000
+        ) { msg ->
+            msg.direction == Direction.FIRST && msg.sessionAlias == "sessionAlias"
+        } `do` {
             send(messages[0], "sessionAlias")
 
-            resultBuilder.setSingleMessage(
-                receive(TestMessageType.ORDER_CANCEL_REJECT.typeName, "sessionAlias", Direction.FIRST) {
-                    passOn(TestMessageType.ORDER_CANCEL_REJECT.typeName) { this.sequence == 1L }
-                    failOn(TestMessageType.ORDER_CANCEL_REJECT.typeName) { this.sequence == 2L }
-                }
-            )
+
+            var message = receive(TestMessageType.ORDER_CANCEL_REJECT.typeName, "sessionAlias", Direction.FIRST) {
+                passOn(TestMessageType.ORDER_CANCEL_REJECT.typeName) { this.sequence == 1L }
+                failOn(TestMessageType.ORDER_CANCEL_REJECT.typeName) { this.sequence == 2L }
+            }
+            if (message != null) resultBuilder.setSingleMessage(message)
 
             send(messages[1], "sessionAlias", cleanBuffer = true)
 
             handler respondsWith { subscriptionManager.handler(randomString(), messages[1].toBatch()) }
 
-            resultBuilder.setSingleMessage(
-                receive(TestMessageType.NEW_ORDER_SINGLE.typeName, "sessionAlias", Direction.FIRST) {
-                    passOn(TestMessageType.NEW_ORDER_SINGLE.typeName) { this.sequence == 2L }
-                    failOn(TestMessageType.NEW_ORDER_SINGLE.typeName) { this.sequence == 1L }
-                }
-            )
+
+            message = receive(TestMessageType.NEW_ORDER_SINGLE.typeName, "sessionAlias", Direction.FIRST) {
+                passOn(TestMessageType.NEW_ORDER_SINGLE.typeName) { this.sequence == 2L }
+                failOn(TestMessageType.NEW_ORDER_SINGLE.typeName) { this.sequence == 1L }
+            }
+            if (message != null) resultBuilder.setSingleMessage(message)
         }
         assertEquals(messages[0], resultBuilder.getMessage(0))
         assertEquals(messages[1], resultBuilder.getMessage(1))

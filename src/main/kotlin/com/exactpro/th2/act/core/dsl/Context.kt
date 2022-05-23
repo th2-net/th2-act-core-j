@@ -20,6 +20,7 @@ import com.exactpro.th2.act.core.handlers.IRequestHandler
 import com.exactpro.th2.act.core.handlers.RequestMessageSubmitter
 import com.exactpro.th2.act.core.handlers.decorators.SystemResponseReceiver
 import com.exactpro.th2.act.core.managers.SubscriptionManager
+import com.exactpro.th2.act.core.messages.IMessageType
 import com.exactpro.th2.act.core.messages.MessageMapping
 import com.exactpro.th2.act.core.messages.StatusMapping
 import com.exactpro.th2.act.core.requests.Request
@@ -31,7 +32,6 @@ import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.message.messageType
 import io.grpc.Deadline
-import io.grpc.Status
 import mu.KotlinLogging
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -43,9 +43,9 @@ class Context(
     private val handler: IRequestHandler,
     private val subscriptionManager: SubscriptionManager,
     private val requestContext: RequestContext,
+    private val responder: Responder = Responder(),
     private val timeout: Long
 ) {
-    private var responder: Responder = Responder()
     private lateinit var request: Request
     private val context = io.grpc.Context.current()
     private var blockingStub = context.withDeadlineAfter(timeout, TimeUnit.MILLISECONDS, Executors.newSingleThreadScheduledExecutor())
@@ -67,13 +67,10 @@ class Context(
 
         return if (waitEcho) {
             receive(message.messageType, sessionAlias, Direction.SECOND) {
-                passOn(message.metadata.messageType) {
-                    parentEventId == message.parentEventId
-                }
-                failOn(message.metadata.messageType) {
+                failOn(message.messageType) {
                     parentEventId != message.parentEventId
                 }
-            }
+            } ?: message
         } else message
     }
 
@@ -82,14 +79,19 @@ class Context(
         sessionAlias: String,
         direction: Direction = Direction.SECOND,
         filter: ReceiveBuilder.() -> Boolean
-    ): Message {
+    ): Message? {
         checkingContext()
 
         val connectionID = ConnectionID.newBuilder().setSessionAlias(sessionAlias).build()
         val checkRule = CheckRule(connectionID, responder.getResponseMessages())
         val receiverFactory =
             MessageReceiverFactory(subscriptionManager, connectionID, request.requestMessage, direction, checkRule)
-        val responseProcessor: ResponseProcessor = responseProcessor(MessageType.getMessageType(messageType))
+        val msgType = IMessageType { messageType }
+        val responseProcessor = ResponseProcessor(listOf(MessageMapping(
+            messageTypes = listOf(msgType),
+            checkExactMatch = false,
+            statusMapping = StatusMapping.PASSED
+        )), NoResponseBodyFactory(msgType))
 
         val responseReceiver = SystemResponseReceiver(
             handler, receiverFactory, responseProcessor,
@@ -103,40 +105,24 @@ class Context(
             if (ReceiveBuilder(responseMessage).filter()) return responseMessage
         } else LOGGER.debug("There were no messages matching this selection")
 
-        return Message.getDefaultInstance()
+        return null
     }
 
-    fun repeatUntil(msg: Message? = null, until: (Message) -> Boolean): ((Message) -> Boolean)? =
-        if (msg == null || until.invoke(msg)) until
-        else null
+    fun repeat(func: () -> Message?): () -> Message? = func
 
-    infix fun ((Message) -> Boolean)?.`do`(func: () -> Message): List<Message> {
+    infix fun (() -> Message?).until(until: (Message) -> Boolean): List<Message> {
         val messages = mutableListOf<Message>()
-        do {
-            val message = func.invoke()
-            if (messages.contains(message)) break
-            if (this != null && repeatUntil(message, this) == null) break
-            messages.add(message)
-        } while (this != null && repeatUntil(message, this) != null)
-
+        var msg = this.invoke()
+        while (msg != null && until.invoke(msg)) {
+            messages.add(msg)
+            msg = this.invoke()
+        }
         return messages
-    }
-
-    private val responseProcessor: (MessageType?) -> ResponseProcessor = { msgType ->
-        val messageTypes = mutableListOf<MessageType>()
-        val noResponseBodyFactory = null
-        if (msgType != null) {
-            messageTypes.add(msgType)
-            NoResponseBodyFactory(msgType)
-        }
-        ResponseProcessor(listOf(MessageMapping(messageTypes, false, StatusMapping.PASSED))) {
-            noResponseBodyFactory ?: emptyList()
-        }
     }
 
     private fun checkingContext(){
         if (context.isCancelled) {
-            Status.CANCELLED.withDescription("Cancelled by client").asRuntimeException()
+            throw Exception("Cancelled by client")
         }
         if (getDeadline().isExpired) {
             throw Exception("timeout = $timeout ended before context execution was completed")

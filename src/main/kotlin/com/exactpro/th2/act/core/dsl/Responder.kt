@@ -22,9 +22,10 @@ import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.grpc.RequestStatus
 
 class Responder : IResponder {
-    private var responseMessages = mutableListOf<Message>()
+    private val responseMessages = mutableListOf<Message>()
     private var responseIsSent: Boolean = false
     private  var sentStatus: RequestStatus.Status? = null
+    private var preFilter: ((Message) -> Boolean)? = null
 
     override fun onError(cause: String) {
         sentStatus = RequestStatus.Status.ERROR
@@ -36,13 +37,21 @@ class Responder : IResponder {
         status: RequestStatus.Status, checkpoint: Checkpoint, responses: List<Message>
     ) {
         responses.forEach {
-            responseMessages.add(it)
+            if (preFilter != null){
+                if(preFilter!!.invoke(it)) {
+                    responseMessages.add(it)
+                }
+            } else  responseMessages.add(it)
         }
     }
 
     fun getResponseMessages(): List<Message> = responseMessages
 
     fun cleanResponseMessages(){
-        responseMessages = mutableListOf()
+        responseMessages.removeAll(responseMessages)
+    }
+
+    fun addPreFilter(preFilter: ((Message) -> Boolean)){
+        this.preFilter = preFilter
     }
 }

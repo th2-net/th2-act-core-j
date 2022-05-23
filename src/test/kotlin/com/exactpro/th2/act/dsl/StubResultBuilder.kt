@@ -27,9 +27,7 @@ class StubResultBuilder: IResultBuilder {
     }
 
     fun setListMessages(messages: List<Message>) {
-        messages.forEach {
-            this.messages.add(it)
-        }
+        this.messages.addAll(messages)
     }
 
     fun getMessage(i: Int): Message = messages[i]

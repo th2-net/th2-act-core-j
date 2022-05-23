@@ -22,24 +22,21 @@ import com.exactpro.th2.act.core.requests.RequestContext
 import com.exactpro.th2.act.core.routers.EventRouter
 import com.exactpro.th2.act.core.routers.MessageRouter
 import com.exactpro.th2.common.grpc.Checkpoint
-import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.Message
-import com.exactpro.th2.common.message.direction
-import com.exactpro.th2.common.message.sessionAlias
 
 fun context(
+    handler: IRequestHandler,
+    subscriptionManager: SubscriptionManager,
     rpcName: String,
     requestName: String,
-    handler: IRequestHandler,
     messageRouter: MessageRouter,
     eventRouter: EventRouter,
     parentEventID: EventID,
     timeout: Long,
-): Context = Context(
-    handler,
-    SubscriptionManager(),
-    RequestContext(
+    preFilter: ((Message) -> Boolean)? = null
+): Context {
+    val requestContext = RequestContext(
         rpcName,
         requestName,
         messageRouter,
@@ -47,94 +44,14 @@ fun context(
         parentEventID,
         Checkpoint.getDefaultInstance(),
         io.grpc.Context.current()
-    ),
-    timeout
-)
+    )
 
-fun context(
-    handler: IRequestHandler,
-    rpcName: String,
-    requestName: String,
-    messageRouter: MessageRouter,
-    eventRouter: EventRouter,
-    parentEventID: EventID,
-    timeout: Long,
-    preFilter: ((Message) -> Boolean)
-): Context = Context(
-    handler,
-    subscriptionManager(preFilter),
-    RequestContext(
-        rpcName,
-        requestName,
-        messageRouter,
-        eventRouter,
-        parentEventID,
-        Checkpoint.getDefaultInstance(),
-        io.grpc.Context.current()
-    ),
-    timeout
-)
+    val responder = Responder()
+    if (preFilter != null) responder.addPreFilter(preFilter)
 
-fun context(
-    handler: IRequestHandler,
-    rpcName: String,
-    requestName: String,
-    messageRouter: MessageRouter,
-    eventRouter: EventRouter,
-    parentEventID: EventID,
-    timeout: Long,
-    connectivity: Map<String, Direction>
-): Context = Context(
-    handler,
-    subscriptionManager(
-        listOf<String>().plus(connectivity.keys.toTypedArray()),
-        listOf<Direction>().plus(connectivity.values.toTypedArray())
-    ),
-    RequestContext(
-        rpcName,
-        requestName,
-        messageRouter,
-        eventRouter,
-        parentEventID,
-        Checkpoint.getDefaultInstance(),
-        io.grpc.Context.current()
-    ),
-    timeout
-)
-
-fun context(
-    handler: IRequestHandler,
-    rpcName: String,
-    requestName: String,
-    messageRouter: MessageRouter,
-    eventRouter: EventRouter,
-    parentEventID: EventID,
-    timeout: Long,
-    sessionAlias: String,
-    direction: Direction,
-    anotherSessionAlias: String
-): Context = Context(
-    handler,
-    subscriptionManager(listOf(sessionAlias, anotherSessionAlias), listOf(direction)),
-    RequestContext(
-        rpcName,
-        requestName,
-        messageRouter,
-        eventRouter,
-        parentEventID,
-        Checkpoint.getDefaultInstance(),
-        io.grpc.Context.current()
-    ),
-    timeout
-)
+    return  Context(handler, subscriptionManager, requestContext, responder, timeout )
+}
 
 infix fun Context.`do`(action: Context.() -> Unit) {
     action.invoke(this)
 }
-
-fun subscriptionManager(sessionAliasList: List<String>, directionList: List<Direction>): SubscriptionManager =
-    SubscriptionManager { msg: Message ->
-        sessionAliasList.contains(msg.sessionAlias) && directionList.contains(msg.direction)
-    }
-
-fun subscriptionManager(preFilter: ((Message) -> Boolean)): SubscriptionManager = SubscriptionManager(preFilter)
