@@ -16,40 +16,44 @@
 
 package com.exactpro.th2.act.core.dsl
 
-import com.exactpro.th2.act.core.handlers.IRequestHandler
-import com.exactpro.th2.act.core.managers.SubscriptionManager
 import com.exactpro.th2.act.core.requests.RequestContext
 import com.exactpro.th2.act.core.routers.EventRouter
 import com.exactpro.th2.act.core.routers.MessageRouter
 import com.exactpro.th2.common.grpc.Checkpoint
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.Message
+import com.exactpro.th2.common.schema.factory.CommonFactory
+
 
 fun context(
-    handler: IRequestHandler,
-    subscriptionManager: SubscriptionManager,
+    commonFactory: CommonFactory,
     rpcName: String,
     requestName: String,
-    messageRouter: MessageRouter,
-    eventRouter: EventRouter,
     parentEventID: EventID,
     timeout: Long,
     preFilter: ((Message) -> Boolean)? = null
 ): Context {
+    val messageRouter = MessageRouter(commonFactory.messageRouterParsedBatch)
+
+    val eventRouter = EventRouter(commonFactory.eventBatchRouter)
+
+    val checkpoint = Checkpoint.getDefaultInstance()
+    val current = io.grpc.Context.current()
+
     val requestContext = RequestContext(
         rpcName,
         requestName,
         messageRouter,
         eventRouter,
         parentEventID,
-        Checkpoint.getDefaultInstance(),
-        io.grpc.Context.current()
+        checkpoint,
+        current
     )
 
     val responder = Responder()
     if (preFilter != null) responder.addPreFilter(preFilter)
 
-    return  Context(handler, subscriptionManager, requestContext, responder, timeout )
+    return Context(requestContext, responder, timeout)
 }
 
 infix fun Context.`do`(action: Context.() -> Unit) {

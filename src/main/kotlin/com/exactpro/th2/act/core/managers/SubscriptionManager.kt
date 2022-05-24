@@ -16,7 +16,6 @@
 package com.exactpro.th2.act.core.managers
 
 import com.exactpro.th2.common.grpc.Direction
-import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.grpc.MessageBatch
 import com.exactpro.th2.common.schema.message.MessageListener
 import com.google.protobuf.TextFormat
@@ -28,7 +27,7 @@ typealias MessageBatchListener = MessageListener<MessageBatch>
 
 private val LOGGER = KotlinLogging.logger {}
 
-class SubscriptionManager(private val preFilter: ((Message) -> Boolean)? = null): MessageListener<MessageBatch>, ISubscriptionManager {
+class SubscriptionManager: MessageListener<MessageBatch>, ISubscriptionManager {
 
     private val callbacks: Map<Direction, MutableList<MessageBatchListener>> = EnumMap(
         mapOf(Direction.FIRST to CopyOnWriteArrayList(), Direction.SECOND to CopyOnWriteArrayList())
@@ -59,13 +58,7 @@ class SubscriptionManager(private val preFilter: ((Message) -> Boolean)? = null)
 
         listeners.forEach { listener ->
             try {
-                if (preFilter!= null){
-                    if(preFilter.invoke(message))
-                        listener.handler(consumerTag, messageBatch)
-                }
-                else {
-                    listener.handler(consumerTag, messageBatch)
-                }
+                listener.handler(consumerTag, messageBatch)
             } catch (e: Exception) {
                 LOGGER.error(e) {
                     "Cannot handle batch from $direction. Batch: ${TextFormat.shortDebugString(messageBatch)}"

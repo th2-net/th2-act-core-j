@@ -18,14 +18,12 @@ package com.exactpro.th2.act.core.dsl
 
 import com.exactpro.th2.common.grpc.Message
 
-
 enum class StatusReceiveBuilder(val value: Boolean) {
     PASSED(true),
     FAILED(false)
 }
 
 class ReceiveBuilder(private val message: Message) {
-
     private val fail = StatusReceiveBuilder.FAILED
     private val pass = StatusReceiveBuilder.PASSED
 

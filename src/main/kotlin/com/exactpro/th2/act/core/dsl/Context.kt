@@ -19,6 +19,7 @@ package com.exactpro.th2.act.core.dsl
 import com.exactpro.th2.act.core.handlers.IRequestHandler
 import com.exactpro.th2.act.core.handlers.RequestMessageSubmitter
 import com.exactpro.th2.act.core.handlers.decorators.SystemResponseReceiver
+import com.exactpro.th2.act.core.managers.ISubscriptionManager
 import com.exactpro.th2.act.core.managers.SubscriptionManager
 import com.exactpro.th2.act.core.messages.IMessageType
 import com.exactpro.th2.act.core.messages.MessageMapping
@@ -27,6 +28,7 @@ import com.exactpro.th2.act.core.requests.Request
 import com.exactpro.th2.act.core.requests.RequestContext
 import com.exactpro.th2.act.core.response.NoResponseBodyFactory
 import com.exactpro.th2.act.core.response.ResponseProcessor
+import com.exactpro.th2.act.grpc.ActGrpc.ActImplBase
 import com.exactpro.th2.common.grpc.ConnectionID
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.Message
@@ -36,19 +38,19 @@ import mu.KotlinLogging
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
-
 private val LOGGER = KotlinLogging.logger {}
 
 class Context(
-    private val handler: IRequestHandler,
-    private val subscriptionManager: SubscriptionManager,
     private val requestContext: RequestContext,
-    private val responder: Responder = Responder(),
-    private val timeout: Long
-) {
+    private val responder: Responder,
+    private val timeout: Long,
+    private val handler: IRequestHandler = Handler(),
+    private val subscriptionManager: ISubscriptionManager = SubscriptionManager(),
+): ActImplBase() {
+
     private lateinit var request: Request
-    private val context = io.grpc.Context.current()
-    private var blockingStub = context.withDeadlineAfter(timeout, TimeUnit.MILLISECONDS, Executors.newSingleThreadScheduledExecutor())
+    private val currentContext = io.grpc.Context.current()
+    private var blockingStub = currentContext.withDeadlineAfter(timeout, TimeUnit.MILLISECONDS, Executors.newSingleThreadScheduledExecutor())
 
     fun send(
         message: Message,
@@ -121,7 +123,7 @@ class Context(
     }
 
     private fun checkingContext(){
-        if (context.isCancelled) {
+        if (currentContext.isCancelled) {
             throw Exception("Cancelled by client")
         }
         if (getDeadline().isExpired) {

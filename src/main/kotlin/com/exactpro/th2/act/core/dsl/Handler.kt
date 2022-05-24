@@ -16,12 +16,19 @@
 
 package com.exactpro.th2.act.core.dsl
 
-import com.exactpro.th2.act.core.rules.AbstractSingleConnectionRule
-import com.exactpro.th2.common.grpc.ConnectionID
-import com.exactpro.th2.common.grpc.Message
+import com.exactpro.th2.act.core.handlers.RequestHandler
+import com.exactpro.th2.act.core.requests.IRequest
+import com.exactpro.th2.act.core.requests.RequestContext
+import com.exactpro.th2.act.core.response.IResponder
 
-class CheckRule(connectionID: ConnectionID, private val messages: List<Message>):
-    AbstractSingleConnectionRule(connectionID) {
+class Handler: RequestHandler() {
+    private lateinit var request: IRequest
+    private lateinit var responder: IResponder
+    private lateinit var requestContext: RequestContext
 
-    override fun checkMessageFromConnection(message: Message): Boolean = !messages.contains(message)
+    override fun handle(request: IRequest, responder: IResponder, requestContext: RequestContext) {
+        this.request = request
+        this.responder = responder
+        this.requestContext = requestContext
+    }
 }
