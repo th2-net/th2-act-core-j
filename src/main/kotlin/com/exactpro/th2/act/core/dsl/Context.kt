@@ -28,7 +28,6 @@ import com.exactpro.th2.act.core.requests.Request
 import com.exactpro.th2.act.core.requests.RequestContext
 import com.exactpro.th2.act.core.response.NoResponseBodyFactory
 import com.exactpro.th2.act.core.response.ResponseProcessor
-import com.exactpro.th2.act.grpc.ActGrpc.ActImplBase
 import com.exactpro.th2.common.grpc.ConnectionID
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.Message
@@ -46,7 +45,7 @@ class Context(
     private val timeout: Long,
     private val handler: IRequestHandler = Handler(),
     private val subscriptionManager: ISubscriptionManager = SubscriptionManager(),
-): ActImplBase() {
+){
 
     private lateinit var request: Request
     private val currentContext = io.grpc.Context.current()
