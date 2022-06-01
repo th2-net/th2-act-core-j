@@ -23,6 +23,8 @@ import com.exactpro.th2.common.grpc.Checkpoint
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.schema.factory.CommonFactory
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 
 fun context(
@@ -30,16 +32,13 @@ fun context(
     rpcName: String,
     requestName: String,
     parentEventID: EventID,
-    timeout: Long,
+    timeout: Long = 10_000,
     preFilter: ((Message) -> Boolean)? = null
 ): Context {
     val messageRouter = MessageRouter(commonFactory.messageRouterParsedBatch)
-
     val eventRouter = EventRouter(commonFactory.eventBatchRouter)
-
     val checkpoint = Checkpoint.getDefaultInstance()
     val current = io.grpc.Context.current()
-
     val requestContext = RequestContext(
         rpcName,
         requestName,
@@ -49,10 +48,8 @@ fun context(
         checkpoint,
         current
     )
-
     val responder = Responder()
     if (preFilter != null) responder.addPreFilter(preFilter)
-
     return Context(requestContext, responder, timeout)
 }
 

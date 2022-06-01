@@ -82,7 +82,7 @@ class TestDSL {
         )
         val responder = Responder()
         if (preFilter != null) responder.addPreFilter(preFilter)
-        return Context(requestContext, responder, timeout, handler, subscriptionManager)
+        return Context(requestContext, responder, timeout, handler = handler, subscriptionManager = subscriptionManager)
     }
 
     @Test
@@ -135,6 +135,7 @@ class TestDSL {
                 }
             }
         }
+
         assertEquals("timeout = $timeout ended before context execution was completed", exception.message)
     }
 
