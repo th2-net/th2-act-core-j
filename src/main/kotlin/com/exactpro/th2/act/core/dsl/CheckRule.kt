@@ -16,12 +16,43 @@
 
 package com.exactpro.th2.act.core.dsl
 
-import com.exactpro.th2.act.core.rules.AbstractSingleConnectionRule
-import com.exactpro.th2.common.grpc.ConnectionID
+import com.exactpro.th2.act.core.rules.ICheckRule
 import com.exactpro.th2.common.grpc.Message
+import com.exactpro.th2.common.grpc.MessageID
+import com.google.protobuf.TextFormat
+import mu.KotlinLogging
+import java.util.ArrayList
+import java.util.concurrent.atomic.AtomicReference
+private val LOGGER = KotlinLogging.logger {}
 
-class CheckRule(connectionID: ConnectionID, private val messages: List<Message>):
-    AbstractSingleConnectionRule(connectionID) {
+class CheckRule(private val preFilter: ((Message) -> Boolean)?):ICheckRule {
 
-    override fun checkMessageFromConnection(message: Message): Boolean = !messages.contains(message)
+    private val messageIDList: MutableList<MessageID> = ArrayList()
+    private val response = AtomicReference<Message?>(null)
+
+    private fun checkMessageFromConnection(message: Message): Boolean = preFilter?.invoke(message)?: true
+
+    override fun onMessage(message: Message): Boolean {
+        messageIDList.add(message.metadata.id)
+        val match = checkMessageFromConnection(message)
+
+        if (match) {
+            if (response.compareAndSet(null, message)) {
+                LOGGER.debug {
+                    "Message matches the rule ${javaClass.simpleName}.\n" +
+                            "Message: ${TextFormat.shortDebugString(message)}"
+                }
+            } else {
+                LOGGER.warn {
+                    "Rule matched to more than one response message.\n" +
+                            "Previous Matched Message: ${TextFormat.shortDebugString(message)}"
+                }
+            }
+        }
+        return match
+    }
+
+    override fun processedIDs(): List<MessageID> = messageIDList
+
+    override fun getResponse(): Message? = response.get()
 }

@@ -16,6 +16,7 @@
 
 package com.exactpro.th2.act.core.response
 
+import com.exactpro.th2.act.core.dsl.ReceiveBuilder
 import com.exactpro.th2.act.core.messages.MessageMapping
 import com.exactpro.th2.act.core.requests.RequestContext
 import com.exactpro.th2.common.grpc.Message
@@ -27,7 +28,10 @@ private val LOGGER = KotlinLogging.logger {}
 
 class ResponseProcessor(
     private val expectedMessages: Collection<MessageMapping>,
-    private val noResponseBodyFactory: IBodyDataFactory
+    private val noResponseBodyFactory: IBodyDataFactory,
+    private val responderMessage: List<Message> = listOf(),
+    private val filterReceive: ReceiveBuilder.() -> Boolean = { true },
+    private var filter: ((Message) -> Boolean) = { true }
 ): IResponseProcessor {
 
     override fun process(
@@ -68,7 +72,19 @@ class ResponseProcessor(
         }
 
         if (!responder.isResponseSent) {
-            responder.onResponseFound(status, requestContext.checkpoint, responseMessages)
+            val matchedMessages = mutableListOf<Message>()
+
+            for (msg in responseMessages) {
+                if(ReceiveBuilder(msg).filterReceive()
+                    && filter.invoke(msg)
+                    && !responderMessage.contains(msg)
+                ) {
+                    matchedMessages.add(msg)
+                    break
+                }
+            }
+
+            responder.onResponseFound(status, requestContext.checkpoint, matchedMessages)
         } else {
             LOGGER.warn {
                 """Could not send response to client as one was already sent.

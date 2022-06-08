@@ -16,11 +16,7 @@
 
 package com.exactpro.th2.act.core.dsl
 
-import com.exactpro.th2.act.core.handlers.IRequestHandler
 import com.exactpro.th2.act.core.handlers.RequestMessageSubmitter
-import com.exactpro.th2.act.core.handlers.decorators.SystemResponseReceiver
-import com.exactpro.th2.act.core.managers.ISubscriptionManager
-import com.exactpro.th2.act.core.managers.SubscriptionManager
 import com.exactpro.th2.act.core.messages.IMessageType
 import com.exactpro.th2.act.core.messages.MessageMapping
 import com.exactpro.th2.act.core.messages.StatusMapping
@@ -28,35 +24,31 @@ import com.exactpro.th2.act.core.requests.Request
 import com.exactpro.th2.act.core.requests.RequestContext
 import com.exactpro.th2.act.core.response.NoResponseBodyFactory
 import com.exactpro.th2.act.core.response.ResponseProcessor
-import com.exactpro.th2.common.grpc.ConnectionID
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.Message
+import com.exactpro.th2.common.message.direction
 import com.exactpro.th2.common.message.messageType
 import com.exactpro.th2.common.message.sessionAlias
 import io.grpc.Deadline
 import mu.KotlinLogging
-import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit.MILLISECONDS
 
 private val LOGGER = KotlinLogging.logger {}
 
-class Context(
+class Action(
     private val requestContext: RequestContext,
     private val responder: Responder,
-    private val timeout: Long,
-    private val handler: IRequestHandler = Handler(),
-    private val subscriptionManager: ISubscriptionManager = SubscriptionManager(),
+    private val responseReceiver: ResponseReceiver
 ){
     private lateinit var request: Request
-    private val currentContext = io.grpc.Context.current()
-    private val deadline = io.grpc.Context.current().withDeadlineAfter(timeout, MILLISECONDS, Executors.newSingleThreadScheduledExecutor())
     private val requestMessageSubmitter = RequestMessageSubmitter()
 
     fun send(
         message: Message,
         sessionAlias: String = message.sessionAlias,
+        timeout: Long,
         waitEcho: Boolean = false,
-        cleanBuffer: Boolean = false
+        cleanBuffer: Boolean = true
     ): Message {
         checkingContext()
         request = Request(message)
@@ -65,42 +57,46 @@ class Context(
         if (cleanBuffer) responder.cleanResponseMessages()
 
         return if (waitEcho) {
-            receive(message.messageType, sessionAlias, Direction.SECOND) {
-                failOn(message.messageType) {
-                    parentEventId != message.parentEventId
-                }
-            } ?: message
+            receive(message.messageType, timeout, sessionAlias, Direction.SECOND) {
+                failOn(message.messageType) { parentEventId != message.parentEventId }
+            }?: message
         } else message
     }
 
     fun receive(
         messageType: String,
+        timeout: Long,
         sessionAlias: String,
         direction: Direction = Direction.SECOND,
         filter: ReceiveBuilder.() -> Boolean
     ): Message? {
         checkingContext()
 
-        val connectionID = ConnectionID.newBuilder().setSessionAlias(sessionAlias).build()
-        val receiverFactory =
-            MessageReceiverFactory(subscriptionManager, connectionID, request.requestMessage, direction, responder.getResponseMessages())
         val msgType = IMessageType { messageType }
-        val responseProcessor = ResponseProcessor(listOf(MessageMapping(
-            messageTypes = listOf(msgType),
-            checkExactMatch = false,
-            statusMapping = StatusMapping.PASSED
-        )), NoResponseBodyFactory(msgType))
+        val responseProcessor = ResponseProcessor(
+            listOf(MessageMapping(listOf(msgType),false,StatusMapping.PASSED)),
+            NoResponseBodyFactory(msgType),
+            responder.getResponseMessages(),
+            filter
+        ) { msg: Message -> msg.sessionAlias == sessionAlias && msg.direction == direction }
 
-        val responseReceiver = SystemResponseReceiver(handler, receiverFactory, responseProcessor, getTimeout(deadline.deadline))
+        val requestDeadline = requestContext.requestDeadline
+        var deadline: Long = 0
+        if (requestDeadline != null && timeout < requestDeadline.timeRemaining(MILLISECONDS)) deadline = timeout
+        else {
+            val getTimeout = getTimeout(requestDeadline)
+            if (getTimeout != null) {
+                deadline = getTimeout
+                LOGGER.debug { "The timeout for receive exceeds the remaining time. A timeout of $deadline is used." }
+            }
+            else checkingContext()
+        }
+
+        responseReceiver.setData(responseProcessor, deadline)
         responseReceiver.handle(request, responder, requestContext)
 
-        val lastIndex = responder.getResponseMessages().lastIndex
-        if (lastIndex >= 0) {
-            val responseMessage = responder.getResponseMessages()[lastIndex]
-            if (ReceiveBuilder(responseMessage).filter()) return responseMessage
-        } else LOGGER.debug("There were no messages matching this selection")
-
-        return null
+        return if (responder.isCancelled()) null
+        else responder.getResponseMessages().last()
     }
 
     fun repeat(func: () -> Message?): () -> Message? = func
@@ -115,14 +111,15 @@ class Context(
         return messages
     }
 
-    private fun checkingContext(){
-        if (currentContext.isCancelled) {
+    private fun checkingContext() {
+        if (requestContext.isCancelled) {
             throw Exception("Cancelled by client")
         }
-        if (getTimeout(deadline.deadline) <= 0L) {
-            throw Exception("timeout = $timeout ended before context execution was completed")
+        val timeout = getTimeout(requestContext.requestDeadline)
+        if (timeout !=null && timeout <= 0L) {
+            throw Exception("Timeout ended before context execution was completed")
         }
     }
 
-    private fun getTimeout(deadline: Deadline?): Long = deadline?.timeRemaining(MILLISECONDS) ?: timeout
+    private fun getTimeout(deadline: Deadline?): Long? = deadline?.timeRemaining(MILLISECONDS)
 }

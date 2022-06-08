@@ -24,8 +24,8 @@ import com.exactpro.th2.common.grpc.RequestStatus
 class Responder : IResponder {
     private val responseMessages = mutableListOf<Message>()
     private var responseIsSent: Boolean = false
-    private  var sentStatus: RequestStatus.Status? = null
-    private var preFilter: ((Message) -> Boolean)? = null
+    private var sentStatus: RequestStatus.Status? = null
+    private var isCancelled = false
 
     override fun onError(cause: String) {
         sentStatus = RequestStatus.Status.ERROR
@@ -36,13 +36,8 @@ class Responder : IResponder {
     override fun onResponseFound(
         status: RequestStatus.Status, checkpoint: Checkpoint, responses: List<Message>
     ) {
-        responses.forEach {
-            if (preFilter != null){
-                if(preFilter!!.invoke(it)) {
-                    responseMessages.add(it)
-                }
-            } else  responseMessages.add(it)
-        }
+        isCancelled = responses.isEmpty()
+        responseMessages.addAll(responses)
     }
 
     fun getResponseMessages(): List<Message> = responseMessages
@@ -51,7 +46,5 @@ class Responder : IResponder {
         responseMessages.removeAll(responseMessages)
     }
 
-    fun addPreFilter(preFilter: ((Message) -> Boolean)){
-        this.preFilter = preFilter
-    }
+    fun isCancelled(): Boolean = isCancelled
 }

@@ -16,6 +16,7 @@
 
 package com.exactpro.th2.act.core.requests
 
+import com.exactpro.th2.act.core.managers.SubscriptionManager
 import com.exactpro.th2.act.core.routers.EventRouter
 import com.exactpro.th2.act.core.routers.MessageRouter
 import com.exactpro.th2.common.grpc.Checkpoint
@@ -41,7 +42,8 @@ data class RequestContext(
     val eventBatchRouter: EventRouter,
     val parentEventID: EventID,
     val checkpoint: Checkpoint,
-    private val rpcContext: Context = Context.current()
+    private val rpcContext: Context = Context.current(),
+    val subscriptionManager: SubscriptionManager = SubscriptionManager()
 ) {
     /**
      * Returns the deadline for the underlying rpc Context or `null` if none is set.
