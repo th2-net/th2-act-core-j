@@ -29,7 +29,6 @@ import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.message.direction
 import com.exactpro.th2.common.message.messageType
 import com.exactpro.th2.common.message.sessionAlias
-import io.grpc.Deadline
 import mu.KotlinLogging
 import java.util.concurrent.TimeUnit.MILLISECONDS
 
@@ -87,7 +86,7 @@ class Action(
         var deadline: Long = 0
         if (requestDeadline != null && timeout < requestDeadline.timeRemaining(MILLISECONDS)) deadline = timeout
         else {
-            val getTimeout = getTimeout(requestDeadline)
+            val getTimeout = requestDeadline?.timeRemaining(MILLISECONDS)
             if (getTimeout != null) {
                 deadline = getTimeout
                 LOGGER.debug { "The timeout for receive exceeds the remaining time. A timeout of $deadline is used." }
@@ -118,11 +117,8 @@ class Action(
         if (requestContext.isCancelled) {
             throw Exception("Cancelled by client")
         }
-        val timeout = getTimeout(requestContext.requestDeadline)
-        if (timeout !=null && timeout <= 0L) {
+        if (requestContext.isOverDeadline) {
             throw Exception("Timeout ended before context execution was completed")
         }
     }
-
-    private fun getTimeout(deadline: Deadline?): Long? = deadline?.timeRemaining(MILLISECONDS)
 }
