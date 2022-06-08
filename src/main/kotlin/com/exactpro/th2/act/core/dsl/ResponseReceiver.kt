@@ -3,7 +3,6 @@ package com.exactpro.th2.act.core.dsl
 import com.exactpro.th2.act.core.handlers.IRequestHandler
 import com.exactpro.th2.act.core.handlers.decorators.AbstractRequestHandlerDecorator
 import com.exactpro.th2.act.core.monitors.MessageResponseMonitor
-import com.exactpro.th2.act.core.receivers.IMessageReceiverFactory
 import com.exactpro.th2.act.core.requests.IRequest
 import com.exactpro.th2.act.core.requests.RequestContext
 import com.exactpro.th2.act.core.response.IResponder
@@ -16,22 +15,27 @@ import kotlin.system.measureTimeMillis
 private val LOGGER = KotlinLogging.logger {}
 
 class ResponseReceiver(requestHandler: IRequestHandler,
-                            private val messageReceiverFactory: IMessageReceiverFactory
-                       ): AbstractRequestHandlerDecorator(requestHandler) {
+                       messageReceiverFactory: MessageReceiverFactory
+): AbstractRequestHandlerDecorator(requestHandler) {
 
     private lateinit var responseProcessor: IResponseProcessor
     private var responseTimeoutMillis by Delegates.notNull<Long>()
+
+    private val monitor = MessageResponseMonitor()
+    private val messagesReceiver = messageReceiverFactory.from(monitor)
 
     fun setData(responseProcessor: IResponseProcessor, responseTimeoutMillis: Long){
         this.responseProcessor = responseProcessor
         this.responseTimeoutMillis = responseTimeoutMillis
     }
 
+    fun cleanBuffer(){
+        messagesReceiver.cleanMatchedMessages()
+    }
+
     override fun handle(request: IRequest, responder: IResponder, requestContext: RequestContext) {
 
-        val monitor = MessageResponseMonitor()
-
-        messageReceiverFactory.from(monitor).use  { receiver ->
+        messagesReceiver.use  { receiver ->
 
             super.handle(request, responder, requestContext)
 

@@ -267,14 +267,14 @@ class TestDSL {
         for (it in 4 downTo 0) {
             expectedMessages.add(updateDQ126(createDQ126(), it.toString()))
         }
-        handler respondsWith  { var sn = segmentNum
-            while (sn > 0) {
-                subscriptionManager.handler(
-                    randomString(),
-                    updateDQ126(createDQ126(), sn.toString()).toBatch()
-                )
-                sn--
-            } }
+        handler respondsWith  {
+
+            subscriptionManager.handler(
+                randomString(),
+                updateDQ126(createDQ126(), segmentNum.toString()).toBatch()
+            )
+
+        }
         actionFactory.apply {
 
             createAction(randomString(), randomString(), parentEventID, 15_000)
@@ -283,7 +283,7 @@ class TestDSL {
                 val listMessagesDQ126 = ArrayList<Message>()
                 var messageDQ126 = createDQ126()
                 do {
-                    send(messageDQ126, "sessionAlias", 1000, cleanBuffer = false)
+                    send(messageDQ126, "sessionAlias", 1000, cleanBuffer = true)
 
                     val responseDQ126 = receive("DQ126", 1000, "sessionAlias", Direction.FIRST) {
                         passOn("DQ126") {
@@ -301,6 +301,14 @@ class TestDSL {
                         else messageDQ126 = updateDQ126(messageDQ126, segment)
 
                         segmentNum--
+                        handler respondsWith  {
+
+                            subscriptionManager.handler(
+                                randomString(),
+                                updateDQ126(createDQ126(), segmentNum.toString()).toBatch()
+                            )
+
+                        }
                     }
                 } while (segment.toInt() > 0)
                 resultBuilder.setListMessages(listMessagesDQ126)

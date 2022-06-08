@@ -54,7 +54,10 @@ class Action(
         request = Request(message)
         requestMessageSubmitter.handle(request, responder, requestContext)
 
-        if (cleanBuffer) responder.cleanResponseMessages()
+        if (cleanBuffer) {
+            responder.cleanResponseMessages()
+            responseReceiver.cleanBuffer()
+        }
 
         return if (waitEcho) {
             receive(message.messageType, timeout, sessionAlias, Direction.SECOND) {

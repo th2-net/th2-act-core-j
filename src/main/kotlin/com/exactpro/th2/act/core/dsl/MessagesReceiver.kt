@@ -27,7 +27,6 @@ import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.grpc.MessageBatch
 import com.exactpro.th2.common.grpc.MessageID
 import com.exactpro.th2.common.schema.message.MessageListener
-import com.google.protobuf.TextFormat
 import mu.KotlinLogging
 
 private val LOGGER = KotlinLogging.logger {}
@@ -40,8 +39,8 @@ class MessagesReceiver (
 ): AbstractMessageReceiver(monitor) {
 
     private val echoCheckRule = CheckRule { msg -> msg.parentEventId == parentEventID }
-    private val messageListener = createMessageListener(checkRule)
-    private val echoMessageListener = createMessageListener(echoCheckRule)
+    private var messageListener = createMessageListener(checkRule)
+    private var echoMessageListener = createMessageListener(echoCheckRule)
     private var matchedMessages = mutableListOf<Message>()
 
     init {
@@ -54,11 +53,7 @@ class MessagesReceiver (
             LOGGER.debug("Received message batch of size ${batch.serializedSize}. Consumer Tag: $tag")
             for (message in batch.messagesList) {
                 if (checkRule.onMessage(message)) {
-                    LOGGER.debug { "Found match ${TextFormat.shortDebugString(message)}. Skipping other messages" }
-
                     matchedMessages.add(message)
-                    notifyResponseMonitor()
-                    break
                 }
             }
         }
@@ -69,12 +64,20 @@ class MessagesReceiver (
         subscriptionManager.unregister(Direction.SECOND, echoMessageListener)
     }
 
-    override fun getResponseMessages(): List<Message> = matchedMessages
+    override fun getResponseMessages(): List<Message> {
+        messageListener = createMessageListener(checkRule)
+        echoMessageListener = createMessageListener(echoCheckRule)
+        return matchedMessages
+    }
 
     override fun getProcessedMessageIDs(): Collection<MessageID> {
         val processedMessageIDs: MutableList<MessageID> = mutableListOf()
         processedMessageIDs.addAll(checkRule.processedIDs())
         processedMessageIDs.addAll(echoCheckRule.processedIDs())
         return processedMessageIDs
+    }
+
+    fun cleanMatchedMessages(){
+        matchedMessages = mutableListOf()
     }
 }
