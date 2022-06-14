@@ -30,7 +30,7 @@ class ResponseProcessor(
     private val expectedMessages: Collection<MessageMapping>,
     private val noResponseBodyFactory: IBodyDataFactory,
     private val responderMessage: List<Message> = listOf(),
-    private val filterReceive: ReceiveBuilder.() -> Boolean = { true },
+    private val filterReceive: ReceiveBuilder.() -> ReceiveBuilder = { ReceiveBuilder(Message.getDefaultInstance()) },
     private var filter: ((Message) -> Boolean) = { true }
 ): IResponseProcessor {
 
@@ -50,7 +50,6 @@ class ResponseProcessor(
             )
             status = RequestStatus.Status.ERROR
         } else {
-
             val responseMessageTypes = responseMessages.map { it.metadata.messageType }
             val matchingMapping = expectedMessages.find { it.matches(responseMessageTypes) }
 
@@ -75,7 +74,7 @@ class ResponseProcessor(
             val matchedMessages = mutableListOf<Message>()
 
             for (msg in responseMessages) {
-                if(ReceiveBuilder(msg).filterReceive()
+                if(ReceiveBuilder(msg).filterReceive().getStatus()
                     && filter.invoke(msg)
                     && !responderMessage.contains(msg)
                 ) {

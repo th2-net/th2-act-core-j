@@ -19,18 +19,21 @@ package com.exactpro.th2.act.core.dsl
 import com.exactpro.th2.act.core.rules.ICheckRule
 import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.grpc.MessageID
+import com.exactpro.th2.common.message.toJson
 import com.google.protobuf.TextFormat
 import mu.KotlinLogging
 import java.util.ArrayList
 import java.util.concurrent.atomic.AtomicReference
 private val LOGGER = KotlinLogging.logger {}
 
-class CheckRule(private val preFilter: ((Message) -> Boolean)?):ICheckRule {
+class CheckRule(
+    private val preFilter: ((Message) -> Boolean)
+):ICheckRule {
 
     private val messageIDList: MutableList<MessageID> = ArrayList()
     private val response = AtomicReference<Message?>(null)
 
-    private fun checkMessageFromConnection(message: Message): Boolean = preFilter?.invoke(message)?: true
+    private fun checkMessageFromConnection(message: Message): Boolean = preFilter.invoke(message)
 
     override fun onMessage(message: Message): Boolean {
         messageIDList.add(message.metadata.id)
@@ -45,7 +48,7 @@ class CheckRule(private val preFilter: ((Message) -> Boolean)?):ICheckRule {
             } else {
                 LOGGER.warn {
                     "Rule matched to more than one response message.\n" +
-                            "Previous Matched Message: ${TextFormat.shortDebugString(message)}"
+                            "Previous Matched Message: ${message.toJson()}"
                 }
             }
         }

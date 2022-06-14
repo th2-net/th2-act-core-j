@@ -50,13 +50,14 @@ class Action(
         cleanBuffer: Boolean = true
     ): Message {
         checkingContext()
-        request = Request(message)
-        requestMessageSubmitter.handle(request, responder, requestContext)
-
+        
         if (cleanBuffer) {
             responder.cleanResponseMessages()
             responseReceiver.cleanBuffer()
         }
+
+        request = Request(message)
+        requestMessageSubmitter.handle(request, responder, requestContext)
 
         return if (waitEcho) {
             receive(message.messageType, timeout, sessionAlias, Direction.SECOND) {
@@ -70,7 +71,7 @@ class Action(
         timeout: Long,
         sessionAlias: String,
         direction: Direction = Direction.SECOND,
-        filter: ReceiveBuilder.() -> Boolean
+        filter: ReceiveBuilder.() -> ReceiveBuilder
     ): Message? {
         checkingContext()
 
@@ -115,10 +116,10 @@ class Action(
 
     private fun checkingContext() {
         if (requestContext.isCancelled) {
-            throw Exception("Cancelled by client")
+            throw RuntimeException("Cancelled by client")
         }
         if (requestContext.isOverDeadline) {
-            throw Exception("Timeout ended before context execution was completed")
+            throw RuntimeException("Timeout ended before context execution was completed")
         }
     }
 }

@@ -17,14 +17,13 @@
 package com.exactpro.th2.act.core.requests
 
 import com.exactpro.th2.act.core.managers.ISubscriptionManager
-import com.exactpro.th2.act.core.managers.SubscriptionManager
 import com.exactpro.th2.act.core.routers.EventRouter
 import com.exactpro.th2.act.core.routers.MessageRouter
 import com.exactpro.th2.common.grpc.Checkpoint
 import com.exactpro.th2.common.grpc.EventID
 import io.grpc.Context
 import io.grpc.Deadline
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeUnit.MILLISECONDS
 
 /**
  * Creates a data object for a request.
@@ -46,7 +45,8 @@ data class RequestContext(
     val parentEventID: EventID,
     val checkpoint: Checkpoint,
     private val rpcContext: Context = Context.current(),
-    val subscriptionManager: ISubscriptionManager = SubscriptionManager()
+    val subscriptionManager: ISubscriptionManager,
+    val timeout: Long = rpcContext.deadline.timeRemaining(MILLISECONDS)
 ) {
     /**
      * Returns the deadline for the underlying rpc Context or `null` if none is set.
@@ -72,5 +72,5 @@ data class RequestContext(
      * Returns 'true' if the deadline is over, otherwise 'false'.
      */
     val isOverDeadline: Boolean
-        get() = System.currentTimeMillis() - startTime >= rpcContext.deadline.timeRemaining(TimeUnit.MILLISECONDS)
+        get() = System.currentTimeMillis() - startTime >= timeout
 }

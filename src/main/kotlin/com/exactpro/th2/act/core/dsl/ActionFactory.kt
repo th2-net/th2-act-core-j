@@ -32,32 +32,25 @@ class ActionFactory(
     private val subscriptionManager: SubscriptionManager,
     private val handler: IRequestHandler
 ) {
-    private lateinit var withDeadline: Context.CancellableContext
+    private lateinit var requestContext: RequestContext
 
     fun createAction(
         rpcName: String,
         requestName: String,
         parentEventID: EventID,
         timeout: Long = Context.current().deadline.timeRemaining(MILLISECONDS),
-        preFilter: ((Message) -> Boolean)? = null
+        preFilter: ((Message) -> Boolean) = { true }
     ): Action {
 
-        val checkpoint = Checkpoint.getDefaultInstance()
-        withDeadline = Context.current().withDeadlineAfter(
-            timeout,
-            MILLISECONDS,
-            Executors.newSingleThreadScheduledExecutor()
-        )
-
-        val requestContext = RequestContext(
+        requestContext = RequestContext(
             rpcName,
             requestName,
             messageRouter,
             eventRouter,
             parentEventID,
-            checkpoint,
-            withDeadline,
-            subscriptionManager
+            Checkpoint.getDefaultInstance(),
+            subscriptionManager = subscriptionManager,
+            timeout = timeout
         )
 
         val responder = Responder()
@@ -69,10 +62,6 @@ class ActionFactory(
     }
 
     infix fun Action.`do`(action: Action.() -> Unit) {
-        try {
-            action.invoke(this)
-        } finally {
-            withDeadline.detach(withDeadline.attach())
-        }
+        action.invoke(this).run {  }
     }
 }

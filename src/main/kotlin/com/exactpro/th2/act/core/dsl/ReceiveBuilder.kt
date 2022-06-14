@@ -27,12 +27,17 @@ class ReceiveBuilder(private val message: Message) {
     private val fail = StatusReceiveBuilder.FAILED
     private val pass = StatusReceiveBuilder.PASSED
 
-    fun passOn(msgType: String, filter: Message.() -> Boolean): Boolean = pass.on(msgType, filter)
+    private var status: Boolean = true
 
-    fun failOn(msgType: String, filter: Message.() -> Boolean): Boolean = fail.on(msgType, filter)
+    fun getStatus(): Boolean = status
 
-    fun StatusReceiveBuilder.on(msgType: String, filter: Message.() -> Boolean): Boolean {
-        return if (message.metadata.messageType == msgType && filter.invoke(message)) this.value
-        else !this.value
+    fun passOn(msgType: String, filter: Message.() -> Boolean): ReceiveBuilder = pass.on(msgType, filter)
+
+    fun failOn(msgType: String, filter: Message.() -> Boolean): ReceiveBuilder = fail.on(msgType, filter)
+
+    fun StatusReceiveBuilder.on(msgType: String, filter: Message.() -> Boolean): ReceiveBuilder {
+        if (message.metadata.messageType == msgType && filter.invoke(message)) status = this.value
+        else if (status) status = !this.value
+        return this@ReceiveBuilder
     }
 }
