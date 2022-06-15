@@ -21,22 +21,18 @@ import com.exactpro.th2.act.core.monitors.IMessageResponseMonitor
 import com.exactpro.th2.act.core.monitors.MessageResponseMonitor
 import com.exactpro.th2.act.core.receivers.AbstractMessageReceiver
 import com.exactpro.th2.act.core.rules.ICheckRule
-import com.exactpro.th2.common.grpc.Direction
-import com.exactpro.th2.common.grpc.EventID
-import com.exactpro.th2.common.grpc.Message
-import com.exactpro.th2.common.grpc.MessageBatch
-import com.exactpro.th2.common.grpc.MessageID
+import com.exactpro.th2.common.grpc.*
 import com.exactpro.th2.common.schema.message.MessageListener
 import mu.KotlinLogging
 
 private val LOGGER = KotlinLogging.logger {}
 
-class MessagesReceiver (
+class MessagesReceiver(
     private val subscriptionManager: ISubscriptionManager,
     monitor: IMessageResponseMonitor = MessageResponseMonitor(),
     private val checkRule: ICheckRule,
     private val parentEventID: EventID
-): AbstractMessageReceiver(monitor) {
+) : AbstractMessageReceiver(monitor) {
 
     private val echoCheckRule = CheckRule { msg -> msg.parentEventId == parentEventID }
     private var messageListener = createMessageListener(checkRule)
@@ -56,6 +52,7 @@ class MessagesReceiver (
                     matchedMessages.add(message)
                 }
             }
+            if (matchedMessages.isNotEmpty()) notifyResponseMonitor()
         }
     }
 
@@ -77,7 +74,7 @@ class MessagesReceiver (
         return processedMessageIDs
     }
 
-    fun cleanMatchedMessages(){
+    fun cleanMatchedMessages() {
         matchedMessages = mutableListOf()
     }
 }

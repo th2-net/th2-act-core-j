@@ -50,7 +50,9 @@ internal class TestMessageEchoValidator {
             messageBatchRouter = mockk { },
             eventBatchRouter = eventBatchRouter,
             parentEventID = parentEventID,
-            checkpoint = Checkpoint.getDefaultInstance()
+            checkpoint = Checkpoint.getDefaultInstance(),
+            SubscriptionManager(),
+            1000
         )
 
     private lateinit var request: IRequest

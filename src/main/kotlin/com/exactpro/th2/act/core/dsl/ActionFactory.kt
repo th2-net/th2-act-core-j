@@ -16,32 +16,32 @@
 
 package com.exactpro.th2.act.core.dsl
 
-import com.exactpro.th2.act.core.handlers.IRequestHandler
 import com.exactpro.th2.act.core.managers.SubscriptionManager
 import com.exactpro.th2.act.core.requests.RequestContext
 import com.exactpro.th2.act.core.routers.EventRouter
 import com.exactpro.th2.act.core.routers.MessageRouter
-import com.exactpro.th2.common.grpc.*
+import com.exactpro.th2.common.grpc.Checkpoint
+import com.exactpro.th2.common.grpc.EventID
+import com.exactpro.th2.common.grpc.Message
 import io.grpc.Context
-import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit.MILLISECONDS
 
 class ActionFactory(
     private val messageRouter: MessageRouter,
     private val eventRouter: EventRouter,
-    private val subscriptionManager: SubscriptionManager,
-    private val handler: IRequestHandler
+    private val subscriptionManager: SubscriptionManager
 ) {
     private lateinit var requestContext: RequestContext
+    private lateinit var parentEventID: EventID
+    private lateinit var preFilter: (Message) -> Boolean
 
     fun createAction(
         rpcName: String,
         requestName: String,
         parentEventID: EventID,
-        timeout: Long = Context.current().deadline.timeRemaining(MILLISECONDS),
-        preFilter: ((Message) -> Boolean) = { true }
-    ): Action {
-
+        timeout: Long = Context.current().deadline.timeRemaining(MILLISECONDS)
+    ): ActionFactory {
+        this.parentEventID = parentEventID
         requestContext = RequestContext(
             rpcName,
             requestName,
@@ -49,19 +49,24 @@ class ActionFactory(
             eventRouter,
             parentEventID,
             Checkpoint.getDefaultInstance(),
-            subscriptionManager = subscriptionManager,
-            timeout = timeout
+            subscriptionManager,
+            timeout
         )
-
-        val responder = Responder()
-
-        val receiverFactory = MessageReceiverFactory(subscriptionManager, parentEventID, preFilter)
-        val responseReceiver = ResponseReceiver(handler, receiverFactory)
-
-        return Action(requestContext, responder, responseReceiver)
+        return this@ActionFactory
     }
 
-    infix fun Action.`do`(action: Action.() -> Unit) {
-        action.invoke(this).run {  }
+    fun preFilter(
+        preFilter: ((Message) -> Boolean) = { true }
+    ): ActionFactory {
+        this.preFilter = preFilter
+        return this@ActionFactory
+    }
+
+    fun execute(action: Action.() -> Unit) {
+        val responder = Responder()
+        val receiverFactory = MessageReceiverFactory(subscriptionManager, parentEventID, preFilter)
+        val responseReceiver = ResponseReceiver(receiverFactory)
+        val actionFactory = Action(requestContext, responder, responseReceiver)
+        action.invoke(actionFactory)
     }
 }

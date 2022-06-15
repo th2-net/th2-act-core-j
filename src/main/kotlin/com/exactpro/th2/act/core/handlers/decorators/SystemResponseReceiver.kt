@@ -23,6 +23,7 @@ import com.exactpro.th2.act.core.requests.IRequest
 import com.exactpro.th2.act.core.requests.RequestContext
 import com.exactpro.th2.act.core.response.IResponder
 import com.exactpro.th2.act.core.response.IResponseProcessor
+import io.grpc.Context
 import io.grpc.Deadline
 import mu.KotlinLogging
 import java.util.concurrent.TimeUnit
@@ -49,7 +50,7 @@ class SystemResponseReceiver(
                 return
             }
 
-            val timeout = getTimeout(requestContext.requestDeadline)
+            val timeout = requestContext.requestDeadline
             LOGGER.info("Synchronization timeout: {} ms", timeout)
 
             val elapsed = measureTimeMillis { monitor.await(timeout, TimeUnit.MILLISECONDS) }
@@ -58,8 +59,8 @@ class SystemResponseReceiver(
                 LOGGER.debug("Response Monitor notified in $elapsed ms for ${requestContext.rpcName}")
             }
 
-            if (requestContext.isCancelled) {
-                val cause = requestContext.cancellationCause
+            if (Context.current().isCancelled) {
+                val cause = Context.current().cancellationCause()
                 LOGGER.error("The request was cancelled by the client.", cause)
                 responder.onError("The request was cancelled by the client. Reason: ${cause?.message}")
             }
@@ -68,9 +69,5 @@ class SystemResponseReceiver(
                 receiver.responseMessages, receiver.processedMessageIDs, responder, requestContext
             )
         }
-    }
-
-    private fun getTimeout(deadline: Deadline?): Long {
-        return deadline?.timeRemaining(TimeUnit.MILLISECONDS) ?: responseTimeoutMillis
     }
 }

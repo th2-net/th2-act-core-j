@@ -17,6 +17,7 @@
 package com.exactpro.th2.act.core.response
 
 import com.exactpro.th2.act.*
+import com.exactpro.th2.act.core.managers.SubscriptionManager
 import com.exactpro.th2.act.core.messages.failedOn
 import com.exactpro.th2.act.core.messages.passedOn
 import com.exactpro.th2.act.core.messages.passedOnExact
@@ -56,7 +57,9 @@ internal class TestResponseProcessor {
         messageBatchRouter = mockk { },
         eventBatchRouter = eventRouter,
         parentEventID = randomString().toEventID(),
-        checkpoint = Checkpoint.getDefaultInstance()
+        checkpoint = Checkpoint.getDefaultInstance(),
+        SubscriptionManager(),
+        1000
     )
 
     private lateinit var responder: IResponder

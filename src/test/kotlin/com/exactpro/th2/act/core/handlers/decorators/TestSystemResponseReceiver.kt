@@ -135,7 +135,8 @@ internal class TestSystemResponseReceiver {
         eventBatchRouter = EventRouter(StubMessageRouter()),
         parentEventID = randomString().toEventID(),
         checkpoint = Checkpoint.getDefaultInstance(),
-        rpcContext = rpcContext
+        SubscriptionManager(),
+        1000
     )
 
     private lateinit var request: IRequest

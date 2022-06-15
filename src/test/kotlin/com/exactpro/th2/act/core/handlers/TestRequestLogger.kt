@@ -16,6 +16,7 @@
 
 package com.exactpro.th2.act.core.handlers
 
+import com.exactpro.th2.act.core.managers.SubscriptionManager
 import com.exactpro.th2.act.core.requests.IRequest
 import com.exactpro.th2.act.core.requests.RequestContext
 import com.exactpro.th2.act.core.response.IResponder
@@ -54,7 +55,9 @@ internal class TestRequestLogger {
         messageBatchRouter = mockk { },
         eventBatchRouter = mockk { },
         parentEventID = randomString().toEventID(),
-        checkpoint = Checkpoint.getDefaultInstance()
+        checkpoint = Checkpoint.getDefaultInstance(),
+        SubscriptionManager(),
+        1000
     )
 
     private lateinit var request: IRequest

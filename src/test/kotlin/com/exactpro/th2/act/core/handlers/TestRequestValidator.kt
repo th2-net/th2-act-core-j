@@ -19,6 +19,7 @@ package com.exactpro.th2.act.core.handlers
 import com.exactpro.th2.act.*
 import com.exactpro.th2.act.core.handlers.validations.IRequestValidation
 import com.exactpro.th2.act.core.handlers.validations.ValidationResult
+import com.exactpro.th2.act.core.managers.SubscriptionManager
 import com.exactpro.th2.act.core.requests.Request
 import com.exactpro.th2.act.core.requests.RequestContext
 import com.exactpro.th2.act.core.response.IResponder
@@ -51,7 +52,9 @@ internal class TestRequestValidator {
         messageBatchRouter = mockk { },
         eventBatchRouter = this,
         parentEventID = randomString().toEventID(),
-        checkpoint = Checkpoint.getDefaultInstance()
+        checkpoint = Checkpoint.getDefaultInstance(),
+        SubscriptionManager(),
+        1000
     )
 
     private lateinit var responder: IResponder

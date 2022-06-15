@@ -30,7 +30,6 @@ import com.exactpro.th2.common.message.direction
 import com.exactpro.th2.common.message.messageType
 import com.exactpro.th2.common.message.sessionAlias
 import mu.KotlinLogging
-import java.util.concurrent.TimeUnit.MILLISECONDS
 
 private val LOGGER = KotlinLogging.logger {}
 
@@ -38,8 +37,8 @@ class Action(
     private val requestContext: RequestContext,
     private val responder: Responder,
     private val responseReceiver: ResponseReceiver
-){
-    private lateinit var request: Request
+) {
+
     private val requestMessageSubmitter = RequestMessageSubmitter()
 
     fun send(
@@ -50,19 +49,19 @@ class Action(
         cleanBuffer: Boolean = true
     ): Message {
         checkingContext()
-        
+
         if (cleanBuffer) {
             responder.cleanResponseMessages()
             responseReceiver.cleanBuffer()
         }
 
-        request = Request(message)
+        val request = Request(message)
         requestMessageSubmitter.handle(request, responder, requestContext)
 
         return if (waitEcho) {
             receive(message.messageType, timeout, sessionAlias, Direction.SECOND) {
                 failOn(message.messageType) { parentEventId != message.parentEventId }
-            }?: message
+            } ?: message
         } else message
     }
 
@@ -76,27 +75,23 @@ class Action(
         checkingContext()
 
         val msgType = IMessageType { messageType }
+
         val responseProcessor = ResponseProcessor(
-            listOf(MessageMapping(listOf(msgType),false,StatusMapping.PASSED)),
+            listOf(MessageMapping(listOf(msgType), false, StatusMapping.PASSED)),
             NoResponseBodyFactory(msgType),
             responder.getResponseMessages(),
             filter
         ) { msg: Message -> msg.sessionAlias == sessionAlias && msg.direction == direction }
 
         val requestDeadline = requestContext.requestDeadline
-        var deadline: Long = 0
-        if (requestDeadline != null && timeout < requestDeadline.timeRemaining(MILLISECONDS)) deadline = timeout
-        else {
-            val getTimeout = requestDeadline?.timeRemaining(MILLISECONDS)
-            if (getTimeout != null) {
-                deadline = getTimeout
-                LOGGER.debug { "The timeout for receive exceeds the remaining time. A timeout of $deadline is used." }
+        val deadline: Long =
+            if (timeout < requestDeadline) timeout
+            else {
+                LOGGER.debug { "The timeout for receive exceeds the remaining time. A timeout of $requestDeadline is used." }
+                requestDeadline
             }
-            else checkingContext()
-        }
 
-        responseReceiver.setData(responseProcessor, deadline)
-        responseReceiver.handle(request, responder, requestContext)
+        responseReceiver.handle(responder, requestContext, responseProcessor, deadline)
 
         return if (responder.isCancelled()) null
         else responder.getResponseMessages().last()
@@ -115,11 +110,8 @@ class Action(
     }
 
     private fun checkingContext() {
-        if (requestContext.isCancelled) {
-            throw RuntimeException("Cancelled by client")
-        }
         if (requestContext.isOverDeadline) {
-            throw RuntimeException("Timeout ended before context execution was completed")
+            throw RuntimeException("Timeout = ${requestContext.timeout} ms ended before context execution was completed")
         }
     }
 }
