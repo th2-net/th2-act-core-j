@@ -24,25 +24,27 @@ import com.exactpro.th2.common.grpc.Checkpoint
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.Message
 import io.grpc.Context
+import io.grpc.stub.StreamObserver
 import java.util.concurrent.TimeUnit.MILLISECONDS
 
-class ActionFactory(
+class ActionFactory<T>(
     private val messageRouter: MessageRouter,
     private val eventRouter: EventRouter,
     private val subscriptionManager: SubscriptionManager
 ) {
-    private lateinit var requestContext: RequestContext
+    private lateinit var observer: StreamObserver<T>
     private lateinit var parentEventID: EventID
-    private lateinit var preFilter: (Message) -> Boolean
 
     fun createAction(
+        observer: StreamObserver<T>,
         rpcName: String,
         requestName: String,
         parentEventID: EventID,
         timeout: Long = Context.current().deadline.timeRemaining(MILLISECONDS)
-    ): ActionFactory {
+    ): RequestContext {
+        this.observer = observer
         this.parentEventID = parentEventID
-        requestContext = RequestContext(
+        return RequestContext(
             rpcName,
             requestName,
             messageRouter,
@@ -52,21 +54,27 @@ class ActionFactory(
             subscriptionManager,
             timeout
         )
-        return this@ActionFactory
     }
 
-    fun preFilter(
-        preFilter: ((Message) -> Boolean) = { true }
-    ): ActionFactory {
-        this.preFilter = preFilter
-        return this@ActionFactory
-    }
-
-    fun execute(action: Action.() -> Unit) {
+    fun RequestContext.preFilter(
+        preFilter: ((Message) -> Boolean)
+    ): Action {
         val responder = Responder()
         val receiverFactory = MessageReceiverFactory(subscriptionManager, parentEventID, preFilter)
         val responseReceiver = ResponseReceiver(receiverFactory)
-        val actionFactory = Action(requestContext, responder, responseReceiver)
-        action.invoke(actionFactory)
+        return Action(this, responder, responseReceiver)
+    }
+
+    fun Action.execute(action: Action.() -> Unit) {
+        try {
+            action.invoke(this)
+        } catch (e: Exception){
+            observer.onError(e)
+        }
+        observer.onCompleted()
+    }
+
+    fun emitResult(result: T){
+        observer.onNext(result)
     }
 }

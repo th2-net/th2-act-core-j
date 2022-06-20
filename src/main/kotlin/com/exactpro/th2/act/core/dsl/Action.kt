@@ -61,7 +61,7 @@ class Action(
         return if (waitEcho) {
             receive(message.messageType, timeout, sessionAlias, Direction.SECOND) {
                 failOn(message.messageType) { parentEventId != message.parentEventId }
-            } ?: message
+            }
         } else message
     }
 
@@ -71,7 +71,7 @@ class Action(
         sessionAlias: String,
         direction: Direction = Direction.SECOND,
         filter: ReceiveBuilder.() -> ReceiveBuilder
-    ): Message? {
+    ): Message {
         checkingContext()
 
         val msgType = IMessageType { messageType }
@@ -83,26 +83,29 @@ class Action(
             filter
         ) { msg: Message -> msg.sessionAlias == sessionAlias && msg.direction == direction }
 
-        val requestDeadline = requestContext.requestDeadline
+        val remainingTime = requestContext.remainingTime
         val deadline: Long =
-            if (timeout < requestDeadline) timeout
+            if (timeout < remainingTime) timeout
             else {
-                LOGGER.debug { "The timeout for receive exceeds the remaining time. A timeout of $requestDeadline is used." }
-                requestDeadline
+                LOGGER.debug { "The timeout for receive exceeds the remaining time. A timeout of $remainingTime is used." }
+                remainingTime
             }
 
         responseReceiver.handle(responder, requestContext, responseProcessor, deadline)
 
-        return if (responder.isCancelled()) null
-        else responder.getResponseMessages().last()
+        if (responder.isCancelled()) {
+            throw Exception("Unexpected behavior. The message to receive was not found.")
+        }
+
+        return responder.getResponseMessages().last()
     }
 
-    fun repeat(func: () -> Message?): () -> Message? = func
+    fun repeat(func: () -> Message): () -> Message = func
 
-    infix fun (() -> Message?).until(until: (Message) -> Boolean): List<Message> {
+    infix fun (() -> Message).until(until: (Message) -> Boolean): List<Message> {
         val messages = mutableListOf<Message>()
         var msg = this.invoke()
-        while (msg != null && until.invoke(msg)) {
+        while (until.invoke(msg)) {
             messages.add(msg)
             msg = this.invoke()
         }
