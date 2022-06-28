@@ -30,7 +30,7 @@ class ResponseProcessor(
     private val expectedMessages: Collection<MessageMapping>,
     private val noResponseBodyFactory: IBodyDataFactory,
     private val responderMessage: List<Message> = listOf(),
-    private val filterReceive: ReceiveBuilder.() -> ReceiveBuilder = { ReceiveBuilder(Message.getDefaultInstance()) },
+    private val filterReceive: (ReceiveBuilder.() -> ReceiveBuilder)? = null,
     private var filter: ((Message) -> Boolean) = { true }
 ): IResponseProcessor {
 
@@ -38,7 +38,7 @@ class ResponseProcessor(
         responseMessages: List<Message>,
         processedMessageIDs: Collection<MessageID>,
         responder: IResponder,
-        requestContext: RequestContext
+        requestContext: RequestContext,
     ) {
         val status: RequestStatus.Status
 
@@ -74,11 +74,16 @@ class ResponseProcessor(
             val matchedMessages = mutableListOf<Message>()
 
             for (msg in responseMessages) {
-                if(ReceiveBuilder(msg).filterReceive().getStatus()
-                    && filter.invoke(msg)
-                    && !responderMessage.contains(msg)
-                ) {
-                    matchedMessages.add(msg)
+                if (filterReceive != null) {
+                    if (filterReceive.let { ReceiveBuilder(msg).it() }.getStatus()
+                        && filter.invoke(msg)
+                        && !responderMessage.contains(msg)
+                    ) {
+                        matchedMessages.add(msg)
+                        break
+                    }
+                } else {
+                    matchedMessages.addAll(responseMessages)
                     break
                 }
             }

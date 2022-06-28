@@ -135,8 +135,9 @@ internal class TestSystemResponseReceiver {
         eventBatchRouter = EventRouter(StubMessageRouter()),
         parentEventID = randomString().toEventID(),
         checkpoint = Checkpoint.getDefaultInstance(),
-        SubscriptionManager(),
-        1000
+        subscriptionManager = SubscriptionManager(),
+        timeout = 1_000,
+        rpcContext = rpcContext
     )
 
     private lateinit var request: IRequest
@@ -167,16 +168,16 @@ internal class TestSystemResponseReceiver {
     @Test
     fun `test should create response receiver`() {
         SystemResponseReceiver(requestHandler = handler,
-                               messageReceiverFactory = receiverFactory,
-                               responseProcessor = responseProcessor)
+            messageReceiverFactory = receiverFactory,
+            responseProcessor = responseProcessor)
     }
 
     @Test
     fun `test should call wrapped handler`() {
         val decoratedHandler = SystemResponseReceiver(requestHandler = handler,
-                                                      messageReceiverFactory = receiverFactory,
-                                                      responseProcessor = responseProcessor,
-                                                      responseTimeoutMillis = 1) // So the test will execute fast.
+            messageReceiverFactory = receiverFactory,
+            responseProcessor = responseProcessor,
+            responseTimeoutMillis = 1) // So the test will execute fast.
 
         decoratedHandler.handle(request, responder, requestContext)
 
@@ -191,9 +192,9 @@ internal class TestSystemResponseReceiver {
     fun `test should wait for a response until timeout`() {
         val timeout = 100L
         val decoratedHandler = SystemResponseReceiver(requestHandler = handler,
-                                                      messageReceiverFactory = receiverFactory,
-                                                      responseProcessor = responseProcessor,
-                                                      responseTimeoutMillis = timeout)
+            messageReceiverFactory = receiverFactory,
+            responseProcessor = responseProcessor,
+            responseTimeoutMillis = timeout)
 
         val elapsedTime = measureTimeMillis { decoratedHandler.handle(request, responder, requestContext) }
 
@@ -253,9 +254,9 @@ internal class TestSystemResponseReceiver {
     @Test
     fun `test should send error response to client if rpc context was canceled`() {
         val decoratedHandler = SystemResponseReceiver(requestHandler = handler,
-                                                      messageReceiverFactory = receiverFactory,
-                                                      responseProcessor = responseProcessor,
-                                                      responseTimeoutMillis = 100)
+            messageReceiverFactory = receiverFactory,
+            responseProcessor = responseProcessor,
+            responseTimeoutMillis = 100)
 
         val context = Context.current().withCancellation()
 
@@ -272,9 +273,9 @@ internal class TestSystemResponseReceiver {
     @Test
     fun `test should not send error response to client if a response was already sent`() {
         val decoratedHandler = SystemResponseReceiver(requestHandler = handler,
-                                                      messageReceiverFactory = receiverFactory,
-                                                      responseProcessor = responseProcessor,
-                                                      responseTimeoutMillis = 100)
+            messageReceiverFactory = receiverFactory,
+            responseProcessor = responseProcessor,
+            responseTimeoutMillis = 100)
 
         responder.responseIsSent = true
         val context = Context.current().withCancellation()
