@@ -7,6 +7,6 @@ variables:
   DOCKER_PUBLISH_ENABLED: 'false'
 
 include:
-  - project: 'th2/pipelines'
+  - project: 'vivarium/th2/pipelines'
     ref: master
     file: '/.gitlab-ci-java.yml'
