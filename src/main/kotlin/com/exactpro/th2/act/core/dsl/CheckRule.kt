@@ -27,7 +27,7 @@ import java.util.concurrent.atomic.AtomicReference
 private val LOGGER = KotlinLogging.logger {}
 
 class CheckRule(
-    private val preFilter: ((Message) -> Boolean)
+    private val preFilter: (Message) -> Boolean
 ):ICheckRule {
 
     private val messageIDList: MutableList<MessageID> = ArrayList()

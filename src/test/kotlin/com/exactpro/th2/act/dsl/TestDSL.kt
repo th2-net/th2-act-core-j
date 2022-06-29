@@ -17,7 +17,6 @@
 package com.exactpro.th2.act.dsl
 
 import com.exactpro.th2.act.core.dsl.ActionFactory
-import com.exactpro.th2.act.core.dsl.ReceiveBuilder
 import com.exactpro.th2.act.core.managers.MessageBatchListener
 import com.exactpro.th2.act.core.managers.SubscriptionManager
 import com.exactpro.th2.act.core.routers.EventRouter
@@ -375,37 +374,5 @@ class TestDSL {
                     assertEquals(messages[1], message)
                 }
         }
-    }
-
-    @Test
-    fun `test for ReceiveBuilder`() {
-        val receiveBuilder = ReceiveBuilder(
-            messageBuild(
-                "NewOrderSingle",
-                "sessionAlias",
-                Direction.FIRST,
-                1L
-            ).build()
-        )
-        assertEquals(
-            true,
-            receiveBuilder.passOn("NewOrderSingle") { this.sequence == 1L && this.sessionAlias == "sessionAlias" }
-                .getStatus()
-        )
-        assertEquals(
-            false,
-            receiveBuilder.passOn("NewOrderSingle") { this.sequence == 2L && this.sessionAlias == "anotherSessionAlias" }
-                .getStatus()
-        )
-        assertEquals(
-            false,
-            receiveBuilder.failOn("NewOrderSingle") { this.sequence == 1L && this.sessionAlias == "sessionAlias" }
-                .getStatus()
-        )
-        assertEquals(
-            false,
-            receiveBuilder.failOn("NewOrderSingle") { this.sequence == 2L && this.sessionAlias == "anotherSessionAlias" }
-                .getStatus()
-        )
     }
 }

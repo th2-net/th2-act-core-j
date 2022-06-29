@@ -29,11 +29,13 @@ import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.message.direction
 import com.exactpro.th2.common.message.messageType
 import com.exactpro.th2.common.message.sessionAlias
+import io.grpc.stub.StreamObserver
 import mu.KotlinLogging
 
 private val LOGGER = KotlinLogging.logger {}
 
-class Action(
+class Action<T>(
+    private val observer: StreamObserver<T>,
     private val requestContext: RequestContext,
     private val responder: Responder,
     private val responseReceiver: ResponseReceiver
@@ -104,11 +106,11 @@ class Action(
 
     infix fun (() -> Message).until(until: (Message) -> Boolean): List<Message> {
         val messages = mutableListOf<Message>()
-        var msg = this.invoke()
-        while (until.invoke(msg)) {
+        do {
+            var msg = this.invoke()
             messages.add(msg)
             msg = this.invoke()
-        }
+        } while (until.invoke(msg))
         return messages
     }
 
@@ -116,5 +118,9 @@ class Action(
         if (requestContext.isOverDeadline) {
             throw RuntimeException("Timeout = ${requestContext.timeout} ms ended before context execution was completed")
         }
+    }
+
+    fun emitResult(result: T) {
+        observer.onNext(result)
     }
 }

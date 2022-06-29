@@ -22,7 +22,6 @@ import com.exactpro.th2.act.core.routers.EventRouter
 import com.exactpro.th2.act.core.routers.MessageRouter
 import com.exactpro.th2.common.grpc.Checkpoint
 import com.exactpro.th2.common.grpc.EventID
-import com.exactpro.th2.common.grpc.Message
 import io.grpc.Context
 import io.grpc.stub.StreamObserver
 import java.util.concurrent.TimeUnit.MILLISECONDS
@@ -32,19 +31,15 @@ class ActionFactory<T>(
     private val eventRouter: EventRouter,
     private val subscriptionManager: SubscriptionManager
 ) {
-    private lateinit var observer: StreamObserver<T>
-    private lateinit var parentEventID: EventID
-
     fun createAction(
         observer: StreamObserver<T>,
         rpcName: String,
         requestName: String,
         parentEventID: EventID,
         timeout: Long = Context.current().deadline.timeRemaining(MILLISECONDS)
-    ): RequestContext {
-        this.observer = observer
-        this.parentEventID = parentEventID
-        return RequestContext(
+    ): ActionBuilder<T> {
+
+        val requestContext = RequestContext(
             rpcName,
             requestName,
             messageRouter,
@@ -54,27 +49,7 @@ class ActionFactory<T>(
             subscriptionManager,
             timeout
         )
-    }
 
-    fun RequestContext.preFilter(
-        preFilter: ((Message) -> Boolean)
-    ): Action {
-        val responder = Responder()
-        val receiverFactory = MessageReceiverFactory(subscriptionManager, parentEventID, preFilter)
-        val responseReceiver = ResponseReceiver(receiverFactory)
-        return Action(this, responder, responseReceiver)
-    }
-
-    fun Action.execute(action: Action.() -> Unit) {
-        try {
-            action.invoke(this)
-        } catch (e: Exception){
-            observer.onError(e)
-        }
-        observer.onCompleted()
-    }
-
-    fun emitResult(result: T){
-        observer.onNext(result)
+        return ActionBuilder(observer, requestContext)
     }
 }
