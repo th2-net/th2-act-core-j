@@ -16,11 +16,13 @@
 
 package com.exactpro.th2.act.dsl
 
+import com.exactpro.th2.act.core.dsl.FailedResponseFoundException
 import com.exactpro.th2.act.core.dsl.ReceiveBuilder
 import com.exactpro.th2.common.grpc.*
 import com.exactpro.th2.common.message.sequence
 import com.exactpro.th2.common.message.sessionAlias
 import org.junit.jupiter.api.Assertions
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 
 class TestReceiveBuilder {
@@ -43,20 +45,31 @@ class TestReceiveBuilder {
             receiveBuilder.passOn("NewOrderSingle") { this.sequence == 1L && this.sessionAlias == "sessionAlias" }
                 .getStatus()
         )
+
         Assertions.assertEquals(
             false,
             receiveBuilder.passOn("NewOrderSingle") { this.sequence == 2L && this.sessionAlias == "anotherSessionAlias" }
                 .getStatus()
         )
-        Assertions.assertEquals(
-            false,
+    }
+
+    @Test
+    fun `negative test for ReceiveBuilder`() {
+        val receiveBuilder = ReceiveBuilder(
+            Message.newBuilder().setMetadata(
+                MessageMetadata.newBuilder()
+                    .setMessageType("NewOrderSingle")
+                    .setId(
+                        MessageID.newBuilder().setConnectionId(
+                            ConnectionID.newBuilder().setSessionAlias("sessionAlias").build()
+                        ).setDirection(Direction.FIRST)
+                    )
+            ).setParentEventId(EventID.newBuilder().setId("eventId").build()).apply { this.sequence = 1L }.build()
+        )
+        val exception = assertThrows(FailedResponseFoundException::class.java){
             receiveBuilder.failOn("NewOrderSingle") { this.sequence == 1L && this.sessionAlias == "sessionAlias" }
                 .getStatus()
-        )
-        Assertions.assertEquals(
-            false,
-            receiveBuilder.failOn("NewOrderSingle") { this.sequence == 2L && this.sessionAlias == "anotherSessionAlias" }
-                .getStatus()
-        )
+        }
+        Assertions.assertEquals("failOn", exception.message)
     }
 }

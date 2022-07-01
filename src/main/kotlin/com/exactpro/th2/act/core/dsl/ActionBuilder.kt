@@ -19,6 +19,9 @@ package com.exactpro.th2.act.core.dsl
 import com.exactpro.th2.act.core.requests.RequestContext
 import com.exactpro.th2.common.grpc.Message
 import io.grpc.stub.StreamObserver
+import mu.KotlinLogging
+
+private val LOGGER = KotlinLogging.logger {}
 
 class ActionBuilder<T>(
     private val observer: StreamObserver<T>,
@@ -36,13 +39,24 @@ class ActionBuilder<T>(
     fun execute(action: Action<T>.() -> Unit) {
         val responder = Responder()
         val receiverFactory =
-            MessageReceiverFactory(requestContext.subscriptionManager, requestContext.parentEventID, preFilter)
+            MessageReceiverFactory(requestContext.subscriptionManager, preFilter)
         val responseReceiver = ResponseReceiver(receiverFactory)
         try {
             action.invoke(Action(observer, requestContext, responder, responseReceiver))
-        } catch (e: Exception) {
-            observer.onError(e)
+            observer.onCompleted()
+        } catch (ex: NoResponseFoundException) {
+            sendErrorEvent(ex)
+        } catch (ex: FailedResponseFoundException) {
+            sendErrorEvent(ex)
+        } catch (ex: RuntimeException) {
+            LOGGER.error(ex.message.toString(), ex)
+            observer.onError(ex)
         }
-        observer.onCompleted()
+    }
+
+    private fun sendErrorEvent(ex: Exception){
+        LOGGER.error(ex.message.toString(), ex)
+        requestContext.eventBatchRouter.createErrorEvent(ex.message.toString(), requestContext.parentEventID)
+        observer.onError(ex)
     }
 }

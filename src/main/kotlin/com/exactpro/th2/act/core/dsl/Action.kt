@@ -40,7 +40,6 @@ class Action<T>(
     private val responder: Responder,
     private val responseReceiver: ResponseReceiver
 ) {
-
     private val requestMessageSubmitter = RequestMessageSubmitter()
 
     fun send(
@@ -62,7 +61,7 @@ class Action<T>(
 
         return if (waitEcho) {
             receive(message.messageType, timeout, sessionAlias, Direction.SECOND) {
-                failOn(message.messageType) { parentEventId != message.parentEventId }
+                passOn(message.messageType) { parentEventId == message.parentEventId }
             }
         } else message
     }
@@ -96,7 +95,7 @@ class Action<T>(
         responseReceiver.handle(responder, requestContext, responseProcessor, deadline)
 
         if (responder.isCancelled()) {
-            throw Exception("Unexpected behavior. The message to receive was not found.")
+            throw NoResponseFoundException("Unexpected behavior. The message to receive was not found.")
         }
 
         return responder.getResponseMessages().last()
@@ -107,10 +106,11 @@ class Action<T>(
     infix fun (() -> Message).until(until: (Message) -> Boolean): List<Message> {
         val messages = mutableListOf<Message>()
         do {
-            var msg = this.invoke()
-            messages.add(msg)
-            msg = this.invoke()
+            val msg = this.invoke()
+            if (until.invoke(msg))
+                messages.add(msg)
         } while (until.invoke(msg))
+
         return messages
     }
 

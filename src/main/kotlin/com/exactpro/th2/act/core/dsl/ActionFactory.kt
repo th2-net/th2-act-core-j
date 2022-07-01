@@ -26,19 +26,18 @@ import io.grpc.Context
 import io.grpc.stub.StreamObserver
 import java.util.concurrent.TimeUnit.MILLISECONDS
 
-class ActionFactory<T>(
+class ActionFactory(
     private val messageRouter: MessageRouter,
     private val eventRouter: EventRouter,
     private val subscriptionManager: SubscriptionManager
 ) {
-    fun createAction(
+    fun <T> createAction(
         observer: StreamObserver<T>,
         rpcName: String,
         requestName: String,
         parentEventID: EventID,
         timeout: Long = Context.current().deadline.timeRemaining(MILLISECONDS)
     ): ActionBuilder<T> {
-
         val requestContext = RequestContext(
             rpcName,
             requestName,

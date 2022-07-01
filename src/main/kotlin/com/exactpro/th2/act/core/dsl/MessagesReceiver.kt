@@ -30,18 +30,15 @@ private val LOGGER = KotlinLogging.logger {}
 class MessagesReceiver(
     private val subscriptionManager: ISubscriptionManager,
     monitor: IMessageResponseMonitor = MessageResponseMonitor(),
-    private val checkRule: ICheckRule,
-    private val parentEventID: EventID
+    private val checkRule: ICheckRule
 ) : AbstractMessageReceiver(monitor) {
 
-    private val echoCheckRule = CheckRule { msg -> msg.parentEventId == parentEventID }
     private var messageListener = createMessageListener(checkRule)
-    private var echoMessageListener = createMessageListener(echoCheckRule)
     private var matchedMessages = mutableListOf<Message>()
 
     init {
         this.subscriptionManager.register(Direction.FIRST, messageListener)
-        this.subscriptionManager.register(Direction.SECOND, echoMessageListener)
+        this.subscriptionManager.register(Direction.SECOND, messageListener)
     }
 
     private fun createMessageListener(checkRule: ICheckRule): MessageListener<MessageBatch> {
@@ -58,21 +55,16 @@ class MessagesReceiver(
 
     override fun close() {
         subscriptionManager.unregister(Direction.FIRST, messageListener)
-        subscriptionManager.unregister(Direction.SECOND, echoMessageListener)
+        subscriptionManager.unregister(Direction.SECOND, messageListener)
     }
 
     override fun getResponseMessages(): List<Message> {
         messageListener = createMessageListener(checkRule)
-        echoMessageListener = createMessageListener(echoCheckRule)
         return matchedMessages
     }
 
-    override fun getProcessedMessageIDs(): Collection<MessageID> {
-        val processedMessageIDs: MutableList<MessageID> = mutableListOf()
-        processedMessageIDs.addAll(checkRule.processedIDs())
-        processedMessageIDs.addAll(echoCheckRule.processedIDs())
-        return processedMessageIDs
-    }
+    override fun getProcessedMessageIDs(): Collection<MessageID> = checkRule.processedIDs()
+
 
     fun cleanMatchedMessages() {
         matchedMessages = mutableListOf()

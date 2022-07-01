@@ -23,21 +23,37 @@ enum class StatusReceiveBuilder(val value: Boolean) {
     FAILED(false)
 }
 
-class ReceiveBuilder(private val message: Message) {
+class ReceiveBuilder {
     private val fail = StatusReceiveBuilder.FAILED
     private val pass = StatusReceiveBuilder.PASSED
 
+    private lateinit var message: Message
     private var status: Boolean = true
+    private var noFilter: Boolean = false
+
+    constructor(message: Message){
+        this.message = message
+    }
+
+    constructor(){
+        noFilter = true
+    }
+
+    fun filterAvailability(): Boolean = noFilter
 
     fun getStatus(): Boolean = status
 
-    fun passOn(msgType: String, filter: Message.() -> Boolean): ReceiveBuilder = pass.on(msgType, filter)
+    fun passOn(msgType: String, filter: Message.() -> Boolean): ReceiveBuilder {
+        status = if (message.metadata.messageType == msgType && filter.invoke(message)) pass.value
+        else fail.value
+        return this@ReceiveBuilder
+    }
 
-    fun failOn(msgType: String, filter: Message.() -> Boolean): ReceiveBuilder = fail.on(msgType, filter)
-
-    fun StatusReceiveBuilder.on(msgType: String, filter: Message.() -> Boolean): ReceiveBuilder {
-        if (message.metadata.messageType == msgType && filter.invoke(message)) status = this.value
-        else if (status) status = !this.value
+    fun failOn(msgType: String, filter: Message.() -> Boolean): ReceiveBuilder {
+        if (message.metadata.messageType == msgType && filter.invoke(message)) {
+            status = fail.value
+            throw FailedResponseFoundException("Found a message for failOn.")
+        }
         return this@ReceiveBuilder
     }
 }

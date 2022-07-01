@@ -30,8 +30,8 @@ class ResponseProcessor(
     private val expectedMessages: Collection<MessageMapping>,
     private val noResponseBodyFactory: IBodyDataFactory,
     private val responderMessage: List<Message> = listOf(),
-    private val filterReceive: ReceiveBuilder.() -> ReceiveBuilder = { ReceiveBuilder(Message.getDefaultInstance()) },
-    private var filter: (Message) -> Boolean = { true }
+    private val filterReceive: ReceiveBuilder.() -> ReceiveBuilder = { ReceiveBuilder() },
+    private var filter: ((Message) -> Boolean) = { true }
 ): IResponseProcessor {
 
     override fun process(
@@ -73,6 +73,10 @@ class ResponseProcessor(
         if (!responder.isResponseSent) {
             val matchedMessages = mutableListOf<Message>()
             for (msg in responseMessages) {
+                if (ReceiveBuilder(msg).let(filterReceive).filterAvailability()){
+                    matchedMessages.addAll(responseMessages)
+                    break
+                }
                 if (ReceiveBuilder(msg).let(filterReceive).getStatus()
                     && filter.invoke(msg)
                     && !responderMessage.contains(msg)

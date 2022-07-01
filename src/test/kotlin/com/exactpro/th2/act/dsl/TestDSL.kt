@@ -33,20 +33,24 @@ import io.mockk.spyk
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import strikt.api.expect
+import strikt.assertions.any
+import strikt.assertions.contains
+import strikt.assertions.isEqualTo
 
 class TestDSL {
     private lateinit var messageRouter: MessageRouter
     private lateinit var eventRouter: EventRouter
     private val parentEventID: EventID = EventID.newBuilder().setId("eventId").build()
     private val subscriptionManager: SubscriptionManager = spyk()
-    private lateinit var actionFactory: ActionFactory<Message>
+    private lateinit var actionFactory: ActionFactory
     private var observer: StreamObserver<Message> = spyk()
+    private val eventBatchRouter: StubMessageRouter<EventBatch> = StubMessageRouter()
 
     @BeforeEach
     internal fun setUp() {
         val messageBatchRouter: StubMessageRouter<MessageBatch> = spyk()
         messageRouter = MessageRouter(messageBatchRouter)
-        val eventBatchRouter: StubMessageRouter<EventBatch> = StubMessageRouter()
         eventRouter = EventRouter(eventBatchRouter)
 
         val listeners: Map<Direction, MessageBatchListener> = mapOf(
@@ -372,6 +376,149 @@ class TestDSL {
                     }
                     emitResult(result.addField("Received a NewOrderSingle message", message).build())
                     assertEquals(messages[1], message)
+                }
+        }
+    }
+
+    @Test
+    fun `receiving messages from two directions`() {
+        val messages = mutableListOf<Message>()
+        messages.add(messageBuild("NewOrderSingle", "sessionAlias", Direction.FIRST, 1L).build() )
+        messages.add(messageBuild("NewOrderSingle", "sessionAlias", Direction.FIRST, 2L).build() )
+        messages.add(messageBuild("NewOrderSingle", "sessionAlias", Direction.SECOND, 3L).build() )
+        messages.add(messageBuild("NewOrderSingle", "sessionAlias", Direction.SECOND, 4L).build() )
+
+        actionFactory.apply {
+            createAction(observer, randomString(), randomString(), parentEventID, 10000)
+                .preFilter { msg -> msg.direction == Direction.FIRST && msg.sessionAlias == "sessionAlias" }
+                .execute {
+                    send(
+                        messageBuild("NewOrderSingle", "sessionAlias", Direction.FIRST, 4L).build(),
+                        "sessionAlias", 1000
+                    )
+
+                    messages.forEach { subscriptionManager.handler(randomString(), it.toBatch()) }
+
+                    var message = receive("NewOrderSingle", 1000, "sessionAlias", Direction.FIRST) {
+                        passOn("NewOrderSingle") {
+                            this.sequence == 1L
+                        }
+                        failOn("NewOrderSingle") {
+                            this.sequence == 5L
+                        }
+                    }
+                    assertEquals(messages[0], message)
+
+                    message = receive("NewOrderSingle", 1000, "sessionAlias", Direction.SECOND) {
+                        passOn("NewOrderSingle") {
+                            this.sequence == 4L
+                        }
+                        failOn("NewOrderSingle") {
+                            this.sequence == 5L
+                        }
+                    }
+                    assertEquals(messages[3], message)
+                }
+        }
+    }
+
+    @Test
+    fun `message not found`() {
+        val messages = mutableListOf<Message>()
+        for (it in 3L downTo 1L) {
+            messages.add(
+                messageBuild("OrderCancelReplaceRequest", "sessionAlias", Direction.FIRST, it).build()
+            )
+        }
+
+        actionFactory.apply {
+            createAction(observer, randomString(), randomString(), parentEventID, 10000)
+                .preFilter { msg -> msg.direction == Direction.FIRST && msg.sessionAlias == "sessionAlias" }
+                .execute {
+                    send(
+                        messageBuild("NewOrderSingle", "sessionAlias", Direction.FIRST, 4L).build(),
+                        "sessionAlias", 1000
+                    )
+
+                    messages.forEach { subscriptionManager.handler(randomString(), it.toBatch()) }
+
+                    receive("NewOrderSingle", 1000, "sessionAlias", Direction.FIRST) {
+                        passOn("NewOrderSingle") {
+                            this.sequence == 1L
+                        }
+                        failOn("NewOrderSingle") {
+                            this.sequence == 2L
+                        }
+                    }
+                }
+        }
+
+        expect {
+            that(eventBatchRouter.sent.eventsList).any {
+                get { parentId }.isEqualTo(parentEventID)
+                get { status }.isEqualTo(EventStatus.FAILED)
+                get { type }.isEqualTo("Error")
+                get { name }.contains("An Error has occurred")
+                get { name }.contains("Unexpected behavior. The message to receive was not found.")
+            }
+        }
+    }
+
+    @Test
+    fun `receiving a message for failOn`() {
+        val messages = mutableListOf<Message>()
+        for (it in 5L downTo 1L) {
+            messages.add(
+                messageBuild("NewOrderSingle", "sessionAlias", Direction.FIRST, it).build()
+            )
+        }
+
+        actionFactory.apply {
+            createAction(observer, randomString(), randomString(), parentEventID, 10000)
+                .preFilter { msg -> msg.direction == Direction.FIRST && msg.sessionAlias == "sessionAlias" }
+                .execute {
+                    send(messages[0], "sessionAlias", 1000)
+
+                    messages.forEach { subscriptionManager.handler(randomString(), it.toBatch()) }
+
+                    receive("NewOrderSingle", 1000, "sessionAlias", Direction.FIRST) {
+                        passOn("NewOrderSingle") {
+                            this.sequence == 1L
+                        }
+                        failOn("NewOrderSingle") {
+                            this.sequence == 4L
+                        }
+                    }
+                }
+        }
+
+        expect {
+            that(eventBatchRouter.sent.eventsList).any {
+                get { parentId }.isEqualTo(parentEventID)
+                get { status }.isEqualTo(EventStatus.FAILED)
+                get { type }.isEqualTo("Error")
+                get { name }.contains("An Error has occurred")
+                get { name }.contains("Found a message for failOn.")
+            }
+        }
+    }
+
+    @Test
+    fun `the deadline has ended`() {
+        val timeout = 3L
+        actionFactory.apply {
+            createAction(observer, randomString(), randomString(), parentEventID, timeout)
+                .preFilter { msg -> msg.direction == Direction.FIRST && msg.sessionAlias == "anotherSessionAlias" }
+                .execute {
+                    send(
+                        messageBuild("NewOrderSingle", "sessionAlias", Direction.FIRST, 2L).build(),
+                        "sessionAlias", 1000
+                    )
+
+                    receive("NewOrderSingle", 1000, "sessionAlias", Direction.FIRST) {
+                        passOn("NewOrderSingle") { this.sequence == 1L }
+                        failOn("NewOrderSingle") { this.sequence == 2L }
+                    }
                 }
         }
     }

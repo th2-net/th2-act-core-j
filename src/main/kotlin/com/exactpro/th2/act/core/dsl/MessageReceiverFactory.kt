@@ -19,21 +19,18 @@ package com.exactpro.th2.act.core.dsl
 import com.exactpro.th2.act.core.managers.ISubscriptionManager
 import com.exactpro.th2.act.core.monitors.IMessageResponseMonitor
 import com.exactpro.th2.act.core.receivers.IMessageReceiverFactory
-import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.Message
 
 class MessageReceiverFactory (
     private val subscriptionManager: ISubscriptionManager,
-    private val parentEventID: EventID,
-    private val preFilter: ((Message) -> Boolean)
+    private val preFilter: (Message) -> Boolean
 ): IMessageReceiverFactory {
 
     override fun from(monitor: IMessageResponseMonitor): MessagesReceiver {
         return MessagesReceiver(
             subscriptionManager,
             monitor,
-            CheckRule(preFilter),
-            parentEventID
+            CheckRule(preFilter)
         )
     }
 }
