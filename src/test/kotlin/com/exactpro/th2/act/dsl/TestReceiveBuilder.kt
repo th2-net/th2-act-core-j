@@ -70,6 +70,6 @@ class TestReceiveBuilder {
             receiveBuilder.failOn("NewOrderSingle") { this.sequence == 1L && this.sessionAlias == "sessionAlias" }
                 .getStatus()
         }
-        Assertions.assertEquals("failOn", exception.message)
+        Assertions.assertEquals("Found a message for failOn.", exception.message)
     }
 }
