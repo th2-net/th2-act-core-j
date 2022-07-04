@@ -13,12 +13,7 @@ private val LOGGER = KotlinLogging.logger {}
 class ResponseReceiver(
     messageReceiverFactory: MessageReceiverFactory
 ) {
-    private val monitor = MessageResponseMonitor()
-    private val messagesReceiver = messageReceiverFactory.from(monitor)
-
-    fun cleanBuffer() {
-        messagesReceiver.cleanMatchedMessages()
-    }
+    private val messagesReceiver = messageReceiverFactory.from(MessageResponseMonitor())
 
     fun handle(
         responder: IResponder,
@@ -26,7 +21,11 @@ class ResponseReceiver(
         responseProcessor: IResponseProcessor,
         responseTimeoutMillis: Long
     ) {
+        val monitor = MessageResponseMonitor()
+
         messagesReceiver.use { receiver ->
+            receiver.reloadMonitor(monitor)
+
             if (responder.isResponseSent) {
                 return
             }

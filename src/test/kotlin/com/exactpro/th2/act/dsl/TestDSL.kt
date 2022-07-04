@@ -230,7 +230,7 @@ class TestDSL {
                                 }
                             }
                         } until { mes ->
-                            mes.sequence != 1L
+                            mes.sequence != 2L
                         }
 
                     resultMessages.forEach {
@@ -259,10 +259,12 @@ class TestDSL {
             createAction(observer, randomString(), randomString(), parentEventID, 10_000)
                 .preFilter { msg -> msg.direction == Direction.FIRST && (msg.sessionAlias == "sessionAlias" || msg.sessionAlias == "anotherSessionAlias") }
                 .execute {
-                    subscriptionManager.handler(
-                        randomString(),
-                        updateDQ126(createDQ126(), segmentNum.toString()).toBatch()
-                    )
+                    for (it in 4 downTo 0) {
+                        subscriptionManager.handler(
+                            randomString(),
+                            updateDQ126(createDQ126(), it.toString()).toBatch()
+                        )
+                    }
 
                     val listMessagesDQ126 = ArrayList<Message>()
                     var messageDQ126 = createDQ126()
@@ -283,10 +285,6 @@ class TestDSL {
                         else messageDQ126 = updateDQ126(messageDQ126, segment)
 
                         segmentNum--
-                        subscriptionManager.handler(
-                            randomString(),
-                            updateDQ126(createDQ126(), segmentNum.toString()).toBatch()
-                        )
 
                     } while (segment.toInt() > 0)
                     listMessagesDQ126.forEach {
@@ -390,7 +388,7 @@ class TestDSL {
 
         actionFactory.apply {
             createAction(observer, randomString(), randomString(), parentEventID, 10000)
-                .preFilter { msg -> msg.direction == Direction.FIRST && msg.sessionAlias == "sessionAlias" }
+                .preFilter { msg -> (msg.direction == Direction.FIRST || msg.direction == Direction.SECOND) && msg.sessionAlias == "sessionAlias" }
                 .execute {
                     send(
                         messageBuild("NewOrderSingle", "sessionAlias", Direction.FIRST, 4L).build(),

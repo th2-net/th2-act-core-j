@@ -53,7 +53,6 @@ class Action<T>(
 
         if (cleanBuffer) {
             responder.cleanResponseMessages()
-            responseReceiver.cleanBuffer()
         }
 
         val request = Request(message)
@@ -94,7 +93,7 @@ class Action<T>(
 
         responseReceiver.handle(responder, requestContext, responseProcessor, deadline)
 
-        if (responder.isCancelled()) {
+        if (responder.isMessageNotFound()) {
             throw NoResponseFoundException("Unexpected behavior. The message to receive was not found.")
         }
 
@@ -107,8 +106,7 @@ class Action<T>(
         val messages = mutableListOf<Message>()
         do {
             val msg = this.invoke()
-            if (until.invoke(msg))
-                messages.add(msg)
+            messages.add(msg)
         } while (until.invoke(msg))
 
         return messages

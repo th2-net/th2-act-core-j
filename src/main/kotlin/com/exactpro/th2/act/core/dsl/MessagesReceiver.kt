@@ -19,7 +19,7 @@ package com.exactpro.th2.act.core.dsl
 import com.exactpro.th2.act.core.managers.ISubscriptionManager
 import com.exactpro.th2.act.core.monitors.IMessageResponseMonitor
 import com.exactpro.th2.act.core.monitors.MessageResponseMonitor
-import com.exactpro.th2.act.core.receivers.AbstractMessageReceiver
+import com.exactpro.th2.act.core.receivers.IMessageReceiver
 import com.exactpro.th2.act.core.rules.ICheckRule
 import com.exactpro.th2.common.grpc.*
 import com.exactpro.th2.common.schema.message.MessageListener
@@ -29,9 +29,9 @@ private val LOGGER = KotlinLogging.logger {}
 
 class MessagesReceiver(
     private val subscriptionManager: ISubscriptionManager,
-    monitor: IMessageResponseMonitor = MessageResponseMonitor(),
+    private var monitor: IMessageResponseMonitor = MessageResponseMonitor(),
     private val checkRule: ICheckRule
-) : AbstractMessageReceiver(monitor) {
+): IMessageReceiver {
 
     private var messageListener = createMessageListener(checkRule)
     private var matchedMessages = mutableListOf<Message>()
@@ -39,6 +39,10 @@ class MessagesReceiver(
     init {
         this.subscriptionManager.register(Direction.FIRST, messageListener)
         this.subscriptionManager.register(Direction.SECOND, messageListener)
+    }
+
+    fun reloadMonitor(monitor: IMessageResponseMonitor){
+        this.monitor = monitor
     }
 
     private fun createMessageListener(checkRule: ICheckRule): MessageListener<MessageBatch> {
@@ -49,7 +53,7 @@ class MessagesReceiver(
                     matchedMessages.add(message)
                 }
             }
-            if (matchedMessages.isNotEmpty()) notifyResponseMonitor()
+            if (matchedMessages.isNotEmpty()) monitor.responseReceived()
         }
     }
 
@@ -58,15 +62,7 @@ class MessagesReceiver(
         subscriptionManager.unregister(Direction.SECOND, messageListener)
     }
 
-    override fun getResponseMessages(): List<Message> {
-        messageListener = createMessageListener(checkRule)
-        return matchedMessages
-    }
+    override fun getResponseMessages(): List<Message> = matchedMessages
 
     override fun getProcessedMessageIDs(): Collection<MessageID> = checkRule.processedIDs()
-
-
-    fun cleanMatchedMessages() {
-        matchedMessages = mutableListOf()
-    }
 }

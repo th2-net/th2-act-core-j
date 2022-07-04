@@ -48,14 +48,14 @@ class ActionBuilder<T>(
             sendErrorEvent(ex)
         } catch (ex: FailedResponseFoundException) {
             sendErrorEvent(ex)
-        } catch (ex: RuntimeException) {
-            LOGGER.error(ex.message.toString(), ex)
+        } catch (ex: Exception) {
+            LOGGER.error("Unexpected exception during action execution", ex)
             observer.onError(ex)
         }
     }
 
     private fun sendErrorEvent(ex: Exception){
-        LOGGER.error(ex.message.toString(), ex)
+        LOGGER.error("Action did not finish correctly", ex)
         requestContext.eventBatchRouter.createErrorEvent(ex.message.toString(), requestContext.parentEventID)
         observer.onError(ex)
     }

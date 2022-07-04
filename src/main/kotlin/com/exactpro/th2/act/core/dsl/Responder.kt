@@ -21,11 +21,11 @@ import com.exactpro.th2.common.grpc.Checkpoint
 import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.grpc.RequestStatus
 
-class Responder : IResponder {
+class Responder: IResponder {
     private val responseMessages = mutableListOf<Message>()
     private var responseIsSent: Boolean = false
     private var sentStatus: RequestStatus.Status? = null
-    private var isCancelled = false
+    private var isMessageNotFound = false
 
     override fun onError(cause: String) {
         sentStatus = RequestStatus.Status.ERROR
@@ -36,7 +36,7 @@ class Responder : IResponder {
     override fun onResponseFound(
         status: RequestStatus.Status, checkpoint: Checkpoint, responses: List<Message>
     ) {
-        isCancelled = responses.isEmpty()
+        isMessageNotFound = responses.isEmpty()
         responseMessages.addAll(responses)
     }
 
@@ -46,5 +46,5 @@ class Responder : IResponder {
         responseMessages.removeAll(responseMessages)
     }
 
-    fun isCancelled(): Boolean = isCancelled
+    fun isMessageNotFound(): Boolean = isMessageNotFound
 }
