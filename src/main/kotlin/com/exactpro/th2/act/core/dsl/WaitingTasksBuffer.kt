@@ -16,7 +16,7 @@
 
 package com.exactpro.th2.act.core.dsl
 
-import com.exactpro.th2.act.core.monitors.MessageResponseMonitor
+import com.exactpro.th2.act.core.rules.ICheckRule
 import com.exactpro.th2.common.grpc.Message
 import mu.KotlinLogging
 import java.util.concurrent.TimeUnit
@@ -24,35 +24,26 @@ import kotlin.system.measureTimeMillis
 
 private val LOGGER = KotlinLogging.logger {}
 
-class WaitingTasksBuffer (
-    private val receiveRule: ReceiveRule,
+class WaitingTasksBuffer(
+    private val receiveRule: ICheckRule,
     private val timeout: Long,
-    private val rpcName: String
+    private val monitor: ResponseMonitor,
 ) {
-    private val monitor = MessageResponseMonitor()
-    private lateinit var incomingMessage: Message
-
-    private var elapsed: Long = 0
-
-    fun onMessage(message: Message): Boolean {
-        val math = receiveRule.onMessage(message)
-        if (math) {
-            incomingMessage = message
-        }
-        return math
+    fun matchMessage(message: Message): Boolean {
+        return receiveRule.onMessage(message)
     }
 
-    fun monitorResponseReceived() {
-        LOGGER.debug("Response Monitor notified in $elapsed ms for $rpcName")
-        monitor.responseReceived()
+    fun responseReceived(message: Message) {
+//        LOGGER.debug("Response Monitor notified in $elapsed ms for $rpcName") TODO: remove, won't work because it is called before `await()`
+        monitor.responseMatch(message)
     }
 
     fun await() {
         LOGGER.info("Synchronization timeout: $timeout ms")
-        elapsed = measureTimeMillis { monitor.await(timeout, TimeUnit.MILLISECONDS) }
+        val elapsed = measureTimeMillis { monitor.await(timeout, TimeUnit.MILLISECONDS) }
+        LOGGER.info { "Waited for $elapsed millis" }
     }
 
-    fun isNotified(): Boolean = monitor.isNotified
-
-    fun incomingMessage(): Message = incomingMessage
+    val isNotified: Boolean
+        get() = monitor.isNotified
 }

@@ -23,5 +23,5 @@ class ReceiveRule(
     private val filter: (Message) -> Boolean
 ): AbstractRule() {
     override fun checkMessageFromConnection(message: Message): Boolean =
-        ReceiveBuilder(message).let(filterReceive).getStatus() && filter.invoke(message)
+        filter.invoke(message) && ReceiveBuilder(message).let(filterReceive).getStatus()
 }

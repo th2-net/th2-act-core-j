@@ -19,32 +19,27 @@ package com.exactpro.th2.act.core.dsl
 import com.exactpro.th2.act.core.requests.RequestContext
 import com.exactpro.th2.act.core.response.IResponder
 import com.exactpro.th2.act.core.response.IResponseProcessor
-import com.exactpro.th2.common.grpc.Message
 
 class ResponseReceiver(
     messageReceiverFactory: MessageReceiverFactory
 ) {
-    private val messagesReceiver = messageReceiverFactory.from()
+    private val messagesReceiver = messageReceiverFactory.create()
 
     fun handle(
         responder: IResponder,
         requestContext: RequestContext,
         responseProcessor: IResponseProcessor,
         timeout: Long,
-        receiveRule: ReceiveRule
+        receiveRule: ReceiveRule,
+        collector: ResponseCollector,
     ) {
-        val matchedMessages = mutableListOf<Message>()
-        matchedMessages.addAll(messagesReceiver.bufferSearch(receiveRule))
 
-        if (matchedMessages.isEmpty()) {
-            val task = WaitingTasksBuffer(receiveRule, timeout, requestContext.rpcName)
-            messagesReceiver.submitTask(task)
-            task.await()
-            matchedMessages.addAll(messagesReceiver.incomingMessage())
-        }
+        val task = WaitingTasksBuffer(receiveRule, timeout, collector)
+        messagesReceiver.submitTask(task)
+        task.await()
 
         responseProcessor.process(
-            matchedMessages, messagesReceiver.processedMessageIDs, responder, requestContext
+            collector.responses, receiveRule.processedIDs() /*every message touched by the rule will be there*/, responder, requestContext
         )
     }
 

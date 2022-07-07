@@ -24,7 +24,7 @@ class MessageReceiverFactory(
     private val preFilter: (Message) -> Boolean,
     private val messageBufferSize: Int
 ) {
-    fun from(): MessagesReceiver {
+    fun create(): MessagesReceiver {
         return MessagesReceiver(
             subscriptionManager,
             PreFilterRule(preFilter),

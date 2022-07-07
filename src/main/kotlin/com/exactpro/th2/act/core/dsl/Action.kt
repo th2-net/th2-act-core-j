@@ -42,7 +42,7 @@ class Action<T>(
     private val responseReceiver: ResponseReceiver
 ) {
     private val requestMessageSubmitter = RequestMessageSubmitter()
-    private var seqNumPreviousMessage = Long.MAX_VALUE
+    private var seqNumPreviousMessage = Long.MIN_VALUE
 
     fun send(
         message: Message,
@@ -55,7 +55,7 @@ class Action<T>(
 
         if (cleanBuffer) {
             responseReceiver.cleanMessageBuffer()
-            seqNumPreviousMessage = Long.MAX_VALUE
+            seqNumPreviousMessage = Long.MIN_VALUE
         }
 
         val request = Request(message)
@@ -95,12 +95,13 @@ class Action<T>(
         val receiveRule = ReceiveRule(filter){
                 msg: Message -> msg.sessionAlias == sessionAlias
                 && msg.direction == direction
-                && msg.sequence < seqNumPreviousMessage
+                && msg.sequence > seqNumPreviousMessage
         }
 
-        responseReceiver.handle(responder, requestContext, responseProcessor, deadline, receiveRule)
+        val collector = CountResponseCollector.singleResponse()
+        responseReceiver.handle(responder, requestContext, responseProcessor, deadline, receiveRule, collector)
 
-        val responseMessage = responder.getResponseMessages()[0]
+        val responseMessage = collector.responses.single() // TODO: check that we really have only one message in responses
         seqNumPreviousMessage = responseMessage.sequence
 
         return responseMessage

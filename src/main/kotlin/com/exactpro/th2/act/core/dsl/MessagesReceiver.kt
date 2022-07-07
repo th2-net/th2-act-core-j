@@ -22,16 +22,30 @@ import com.exactpro.th2.common.grpc.*
 import com.exactpro.th2.common.schema.message.MessageListener
 import mu.KotlinLogging
 import java.util.*
+import java.util.concurrent.locks.ReentrantLock
+import java.util.concurrent.locks.ReentrantReadWriteLock
+import javax.annotation.concurrent.GuardedBy
+import javax.annotation.concurrent.ThreadSafe
+import kotlin.concurrent.read
+import kotlin.concurrent.withLock
+import kotlin.concurrent.write
 
 private val LOGGER = KotlinLogging.logger {}
 
+@ThreadSafe
 class MessagesReceiver(
     private val subscriptionManager: ISubscriptionManager,
     private val preFilterRule: PreFilterRule,
     bufferSize: Int = 1000
-): IMessageReceiver {
+) : AutoCloseable {
     private val messageListener = createMessageListener()
+
+    private val bufferLock = ReentrantReadWriteLock()
+    @GuardedBy("bufferLock")
     private val messageBuffer = MessageBuffer(bufferSize)
+
+    private val tasksLock = ReentrantLock()
+    @GuardedBy("tasksLock")
     private val taskBuffer: Queue<WaitingTasksBuffer> = LinkedList()
 
     init {
@@ -41,53 +55,72 @@ class MessagesReceiver(
 
     private fun createMessageListener(): MessageListener<MessageBatch> =
         MessageListener { tag: String, batch: MessageBatch ->
-            LOGGER.debug("Received message batch of size ${batch.serializedSize}. Consumer Tag: $tag")
+            LOGGER.debug("Received message batch of size ${batch.messagesCount}. Consumer Tag: $tag")
             for (message in batch.messagesList) {
                 if (preFilterRule.onMessage(message)) {
-                    messageBuffer.add(message)
 
-                    if (taskBuffer.isNotEmpty()) {
-                        val task = taskBuffer.element()
-                        if (!task.isNotified() && task.onMessage(message)) {
-                            task.monitorResponseReceived()
+                    addToBuffer(message)
+
+                    tasksLock.withLock {
+                        val iterator = taskBuffer.iterator()
+                        while (iterator.hasNext()) {
+                            val task: WaitingTasksBuffer = iterator.next()
+                            if (checkMessage(task, message)) {
+                                iterator.remove()
+                            }
                         }
                     }
                 }
             }
         }
 
+    private fun addToBuffer(message: Message) {
+        bufferLock.write {
+            messageBuffer.add(message)
+        }
+    }
+
     override fun close() {
         subscriptionManager.unregister(Direction.FIRST, messageListener)
         subscriptionManager.unregister(Direction.SECOND, messageListener)
     }
 
-    override fun getResponseMessages(): List<Message> = messageBuffer.getMessages()
 
-    override fun getProcessedMessageIDs(): Collection<MessageID> = preFilterRule.processedIDs()
+    private fun checkMessage(task: WaitingTasksBuffer, message: Message): Boolean {
+        if (task.isNotified) return true
 
-    fun incomingMessage(): List<Message> {
-        val task = taskBuffer.element()
-        if (task.isNotified()) {
-            taskBuffer.remove()
-            return listOf(task.incomingMessage())
+        if (task.matchMessage(message)) {
+            task.responseReceived(message)
+            return task.isNotified // found all responses
         }
-        return listOf()
+
+        return false
     }
 
-    fun bufferSearch(receiveRule: ReceiveRule): List<Message> {
-        responseMessages.forEach {
-            if (receiveRule.onMessage(it)) {
-                return listOf(it)
+    private fun bufferSearch(task: WaitingTasksBuffer): Boolean {
+        bufferLock.read {
+            messageBuffer.getMessages().forEach {
+                if (checkMessage(task, it)) {
+                    return true
+                }
             }
         }
-        return listOf()
+        return false
     }
 
     fun submitTask(task: WaitingTasksBuffer) {
-        taskBuffer.add(task)
+        if (bufferSearch(task)) {
+            LOGGER.info { "Response found in buffer" }
+            return
+        }
+        tasksLock.withLock {
+            taskBuffer.add(task)
+        }
     }
 
     fun cleanMessageBuffer(){
-        messageBuffer.removeAll()
+        bufferLock.write {
+            messageBuffer.removeAll()
+        }
     }
 }

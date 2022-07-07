@@ -17,17 +17,28 @@
 package com.exactpro.th2.act.core.dsl
 
 import com.exactpro.th2.common.grpc.Message
+import com.exactpro.th2.common.message.toJson
+import mu.KotlinLogging
 import java.util.*
+import javax.annotation.concurrent.NotThreadSafe
 
+@NotThreadSafe
 class MessageBuffer(private val bufferSize: Int = 1000) {
-    private val messageBuffer: Queue<Message> = LinkedList()
+    private val messageBuffer: Queue<Message> = ArrayDeque(bufferSize)
 
-    fun getMessages(): List<Message> = messageBuffer.toTypedArray().toList()
+    fun getMessages(): Collection<Message> = messageBuffer
 
     fun add(msg: Message) {
-        if (messageBuffer.size < bufferSize)
-            messageBuffer.add(msg)
+        if (messageBuffer.size >= bufferSize) {
+            val removed = messageBuffer.poll()
+            LOGGER.trace { "Removed from buffer because the max size $bufferSize is reached: ${removed.toJson()}" }
+        }
+        messageBuffer.add(msg)
     }
 
     fun removeAll() = messageBuffer.clear()
+
+    companion object {
+        private val LOGGER = KotlinLogging.logger { }
+    }
 }
