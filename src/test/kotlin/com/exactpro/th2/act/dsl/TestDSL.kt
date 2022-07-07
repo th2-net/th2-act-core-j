@@ -92,8 +92,8 @@ class TestDSL {
     fun `send message and wait echo`() {
         val result = Message.newBuilder()
         val messages = listOf(
-            messageBuild("NewOrderSingle", "sessionAlias", Direction.FIRST, 1L).build(),
-            messageBuild("NewOrderSingle", "sessionAlias", Direction.SECOND, 2L).build()
+            messageBuild("NewOrderSingle", "sessionAlias", Direction.FIRST, 2L).build(),
+            messageBuild("NewOrderSingle", "sessionAlias", Direction.SECOND, 1L).build()
         )
 
         actionFactory.apply {
@@ -101,12 +101,14 @@ class TestDSL {
                 .preFilter { msg -> msg.sessionAlias == "sessionAlias" && (msg.direction == Direction.FIRST || msg.direction == Direction.SECOND) }
                 .execute {
                     messages.forEach { subscriptionManager.handler(randomString(), it.toBatch()) }
-                    val echoMessage = send(messages[0], "sessionAlias", 1000, true, cleanBuffer = false)
+                    val echoMessage = send(messageBuild("NewOrderSingle", "sessionAlias", Direction.FIRST, 1L).build(),
+                        "sessionAlias", 1000, true, cleanBuffer = false)
                     emitResult(result.addField("Received a echo message", echoMessage).build())
 
                     assertEquals(messages[1], echoMessage)
                 }
         }
+        checkingSentEvent("NewOrderSingle")
     }
 
     @Test
@@ -135,20 +137,21 @@ class TestDSL {
                     )
                 }
         }
+        checkingSentEvent("NewOrderSingle")
     }
 
     @Test
     fun `case one`() {
         val result = Message.newBuilder()
         val messages = mutableListOf<Message>()
-        var sequence = 1L
-        while (sequence <= 4L) {
+        var sequence = 4L
+        while (sequence >= 1L) {
             messages.add(
                 messageBuild("QuoteStatusReport", "anotherSessionAlias", Direction.FIRST, sequence)
                     .putFields("quoteId", Value.newBuilder().setSimpleValue("quoteId").build())
                     .putFields("quoteStatus", Value.newBuilder().setSimpleValue("Accepted").build()).build()
             )
-            sequence += 1L
+            sequence--
         }
 
         actionFactory.apply {
@@ -196,13 +199,14 @@ class TestDSL {
                     }
                 }
         }
+        checkingSentEvent("QuoteStatusReport")
     }
 
     @Test
     fun `case two`() {
         val result = Message.newBuilder()
         val messages = mutableListOf<Message>()
-        for (it in 3L downTo 1L) {
+        for (it in 5L downTo 1L) {
             messages.add(
                 messageBuild("NewOrderSingle", "sessionAlias", Direction.FIRST, it).build()
             )
@@ -230,7 +234,7 @@ class TestDSL {
                                 }
                             }
                         } until { mes ->
-                            mes.sequence != 2L
+                            mes.sequence != 4L
                         }
 
                     resultMessages.forEach {
@@ -242,6 +246,7 @@ class TestDSL {
                     assertEquals(messages[1], resultMessages[1])
                 }
         }
+        checkingSentEvent("NewOrderSingle")
     }
 
 
@@ -259,10 +264,9 @@ class TestDSL {
             createAction(observer, randomString(), randomString(), parentEventID, 10_000)
                 .preFilter { msg -> msg.direction == Direction.FIRST && (msg.sessionAlias == "sessionAlias" || msg.sessionAlias == "anotherSessionAlias") }
                 .execute {
-                    for (it in 4 downTo 0) {
+                    expectedMessages.forEach {
                         subscriptionManager.handler(
-                            randomString(),
-                            updateDQ126(createDQ126(), it.toString()).toBatch()
+                            randomString(), it.toBatch()
                         )
                     }
 
@@ -295,6 +299,7 @@ class TestDSL {
                     }
                 }
         }
+        checkingSentEvent("DQ126")
     }
 
     private fun createDQ126(): Message = Message.newBuilder()
@@ -312,15 +317,17 @@ class TestDSL {
         ).build()
 
     private fun updateDQ126(dq126: Message, segment: String): Message = dq126.toBuilder()
-        .putFields("segment_number", Value.newBuilder().setSimpleValue(segment).build()).build()
+        .putFields("segment_number", Value.newBuilder().setSimpleValue(segment).build()).apply { this.sequence =
+            segment.toLong()
+        }.build()
 
 
     @Test
     fun `case four`() {
         val result = Message.newBuilder()
         val messages = listOf(
-            messageBuild("BusinessMessageReject", "sessionAlias", Direction.FIRST, 1L).build(),
-            messageBuild("BusinessMessageReject", "sessionAlias", Direction.SECOND, 2L).build()
+            messageBuild("BusinessMessageReject", "sessionAlias", Direction.SECOND, 2L).build(),
+            messageBuild("BusinessMessageReject", "sessionAlias", Direction.FIRST, 1L).build()
         )
 
         actionFactory.apply {
@@ -329,69 +336,72 @@ class TestDSL {
                 .execute {
                     messages.forEach { subscriptionManager.handler(randomString(), it.toBatch()) }
 
-                    val echoMessage: Message = send(messages[0], "sessionAlias", 1000, true, cleanBuffer = false)
-                    assertEquals(messages[1], echoMessage)
+                    val echoMessage: Message = send(messageBuild("BusinessMessageReject", "sessionAlias", Direction.FIRST, 2L).build(),
+                        "sessionAlias", 1000, true, cleanBuffer = false)
+                    assertEquals(messages[0], echoMessage)
 
                     val message = receive("BusinessMessageReject", 1000, "sessionAlias", Direction.FIRST) {
                         passOn("BusinessMessageReject") { this.sequence == 1L }
-                        failOn("BusinessMessageReject") { this.sequence == 2L }
+                        failOn("BusinessMessageReject") { this.sequence == 3L }
                     }
-
                     emitResult(result.addField("Received a BusinessMessageReject message", message).build())
-                    assertEquals(messages[0], message)
+                    assertEquals(messages[1], message)
                 }
         }
+        checkingSentEvent("BusinessMessageReject")
     }
 
     @Test
     fun `case five`() {
         val result = Message.newBuilder()
         val messages = listOf(
-            messageBuild("OrderCancelReplaceRequest", "sessionAlias", Direction.FIRST, 1L).build(),
-            messageBuild("NewOrderSingle", "sessionAlias", Direction.FIRST, 2L).build()
+            messageBuild("NewOrderSingle", "sessionAlias", Direction.FIRST, 2L).build(),
+            messageBuild("OrderCancelReplaceRequest", "sessionAlias", Direction.FIRST, 1L).build()
         )
 
         actionFactory.apply {
             createAction(observer, randomString(), randomString(), parentEventID, 10000)
                 .preFilter { msg -> msg.direction == Direction.FIRST && msg.sessionAlias == "sessionAlias" }
                 .execute {
-                    send(messages[0], "sessionAlias", 1000)
-
                     messages.forEach { subscriptionManager.handler(randomString(), it.toBatch()) }
 
-                    var message = receive("OrderCancelReplaceRequest", 1000, "sessionAlias", Direction.FIRST) {
+                    send(messages[0], "sessionAlias", 1000, cleanBuffer = false)
+
+                    var message = receive("NewOrderSingle", 1000, "sessionAlias", Direction.FIRST) {
+                        passOn("NewOrderSingle") { this.sequence == 2L }
+                        failOn("NewOrderSingle") { this.sequence == 1L }
+                    }
+                    emitResult(result.addField("Received a NewOrderSingle message", message).build())
+                    assertEquals(messages[0], message)
+
+                    send(messages[1], "sessionAlias", 1000, cleanBuffer = false)
+
+                    message = receive("OrderCancelReplaceRequest", 1000, "sessionAlias", Direction.FIRST) {
                         passOn("OrderCancelReplaceRequest") { this.sequence == 1L }
                         failOn("OrderCancelReplaceRequest") { this.sequence == 2L }
                     }
                     emitResult(message)
 
-                    assertEquals(messages[0], message)
-                    send(messages[1], "sessionAlias", 1000, cleanBuffer = false)
-
-                    message = receive("NewOrderSingle", 1000, "sessionAlias", Direction.FIRST) {
-                        passOn("NewOrderSingle") { this.sequence == 2L }
-                        failOn("NewOrderSingle") { this.sequence == 1L }
-                    }
-                    emitResult(result.addField("Received a NewOrderSingle message", message).build())
                     assertEquals(messages[1], message)
                 }
         }
+        checkingSentEvent("OrderCancelReplaceRequest")
     }
 
     @Test
     fun `receiving messages from two directions`() {
         val messages = mutableListOf<Message>()
-        messages.add(messageBuild("NewOrderSingle", "sessionAlias", Direction.FIRST, 1L).build() )
-        messages.add(messageBuild("NewOrderSingle", "sessionAlias", Direction.FIRST, 2L).build() )
-        messages.add(messageBuild("NewOrderSingle", "sessionAlias", Direction.SECOND, 3L).build() )
-        messages.add(messageBuild("NewOrderSingle", "sessionAlias", Direction.SECOND, 4L).build() )
+        messages.add(messageBuild("NewOrderSingle", "sessionAlias", Direction.FIRST, 4L).build() )
+        messages.add(messageBuild("NewOrderSingle", "sessionAlias", Direction.FIRST, 3L).build() )
+        messages.add(messageBuild("NewOrderSingle", "sessionAlias", Direction.SECOND, 2L).build() )
+        messages.add(messageBuild("NewOrderSingle", "sessionAlias", Direction.SECOND, 1L).build() )
 
         actionFactory.apply {
             createAction(observer, randomString(), randomString(), parentEventID, 10000)
                 .preFilter { msg -> (msg.direction == Direction.FIRST || msg.direction == Direction.SECOND) && msg.sessionAlias == "sessionAlias" }
                 .execute {
                     send(
-                        messageBuild("NewOrderSingle", "sessionAlias", Direction.FIRST, 4L).build(),
+                        messageBuild("NewOrderSingle", "sessionAlias", Direction.FIRST, 5L).build(),
                         "sessionAlias", 1000
                     )
 
@@ -399,7 +409,7 @@ class TestDSL {
 
                     var message = receive("NewOrderSingle", 1000, "sessionAlias", Direction.FIRST) {
                         passOn("NewOrderSingle") {
-                            this.sequence == 1L
+                            this.sequence == 4L
                         }
                         failOn("NewOrderSingle") {
                             this.sequence == 5L
@@ -409,7 +419,7 @@ class TestDSL {
 
                     message = receive("NewOrderSingle", 1000, "sessionAlias", Direction.SECOND) {
                         passOn("NewOrderSingle") {
-                            this.sequence == 4L
+                            this.sequence == 1L
                         }
                         failOn("NewOrderSingle") {
                             this.sequence == 5L
@@ -456,8 +466,8 @@ class TestDSL {
                 get { parentId }.isEqualTo(parentEventID)
                 get { status }.isEqualTo(EventStatus.FAILED)
                 get { type }.isEqualTo("Error")
-                get { name }.contains("An Error has occurred")
-                get { name }.contains("Unexpected behavior. The message to receive was not found.")
+                get { name }.contains("No Response Received")
+                get { name }.contains("The expected response was not received")
             }
         }
     }
@@ -518,6 +528,17 @@ class TestDSL {
                         failOn("NewOrderSingle") { this.sequence == 2L }
                     }
                 }
+        }
+    }
+
+    private fun checkingSentEvent(messageType: String){
+        expect {
+            that(eventBatchRouter.sent.eventsList).any {
+                get { parentId }.isEqualTo(parentEventID)
+                get { status }.isEqualTo(EventStatus.SUCCESS)
+                get { name }.isEqualTo("Received a $messageType message")
+                get { type }.contains("Received Message")
+            }
         }
     }
 }

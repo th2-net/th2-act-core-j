@@ -16,19 +16,10 @@
 
 package com.exactpro.th2.act.core.dsl
 
-import com.exactpro.th2.act.core.managers.ISubscriptionManager
 import com.exactpro.th2.common.grpc.Message
 
-class MessageReceiverFactory(
-    private val subscriptionManager: ISubscriptionManager,
-    private val preFilter: (Message) -> Boolean,
-    private val messageBufferSize: Int
-) {
-    fun from(): MessagesReceiver {
-        return MessagesReceiver(
-            subscriptionManager,
-            PreFilterRule(preFilter),
-            messageBufferSize
-        )
-    }
+class PreFilterRule(
+    private val preFilter: (Message) -> Boolean
+): AbstractRule() {
+    override fun checkMessageFromConnection(message: Message): Boolean = preFilter.invoke(message)
 }

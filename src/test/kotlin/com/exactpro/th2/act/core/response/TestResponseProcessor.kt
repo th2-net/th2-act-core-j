@@ -17,6 +17,7 @@
 package com.exactpro.th2.act.core.response
 
 import com.exactpro.th2.act.*
+import com.exactpro.th2.act.core.dsl.NoResponseFoundException
 import com.exactpro.th2.act.core.managers.SubscriptionManager
 import com.exactpro.th2.act.core.messages.failedOn
 import com.exactpro.th2.act.core.messages.passedOn
@@ -28,6 +29,7 @@ import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.grpc.MessageID
 import com.exactpro.th2.common.grpc.RequestStatus
 import io.mockk.*
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
@@ -150,32 +152,34 @@ internal class TestResponseProcessor {
         every { responder.onResponseFound(any(), any(), any()) } just Runs
         every { eventRouter.createNoResponseEvent(any(), any(), any()) } answers { randomString().toEventID() }
 
-        responseProcessor.process(
-            responseMessages = emptyList(),
-            processedMessageIDs = processedMessages.map { it.metadata.id },
-            responder = responder,
-            requestContext = requestContext
-        )
-
-        val processedMessageIDsSlot = slot<List<MessageID>>()
-        val clientResponseMessagesSlot = slot<List<Message>>()
-
-        verify {
-            eventRouter.createNoResponseEvent(
-                noResponseBodyFactory = noResponseBodyFactory,
-                processedMessageIDs = capture(processedMessageIDsSlot),
-                parentEventID = requestContext.parentEventID
+        assertThrows(NoResponseFoundException::class.java) {
+            responseProcessor.process(
+                responseMessages = emptyList(),
+                processedMessageIDs = processedMessages.map { it.metadata.id },
+                responder = responder,
+                requestContext = requestContext
             )
-        }
-        verify {
-            responder.onResponseFound(
-                RequestStatus.Status.ERROR, requestContext.checkpoint, capture(clientResponseMessagesSlot)
-            )
-        }
 
-        expect {
-            that(processedMessageIDsSlot.captured).containsExactly(processedMessages.map { it.metadata.id })
-            that(clientResponseMessagesSlot.captured).isEmpty()
+            val processedMessageIDsSlot = slot<List<MessageID>>()
+            val clientResponseMessagesSlot = slot<List<Message>>()
+
+            verify {
+                eventRouter.createNoResponseEvent(
+                    noResponseBodyFactory = noResponseBodyFactory,
+                    processedMessageIDs = capture(processedMessageIDsSlot),
+                    parentEventID = requestContext.parentEventID
+                )
+            }
+            verify {
+                responder.onResponseFound(
+                    RequestStatus.Status.ERROR, requestContext.checkpoint, capture(clientResponseMessagesSlot)
+                )
+            }
+
+            expect {
+                that(processedMessageIDsSlot.captured).containsExactly(processedMessages.map { it.metadata.id })
+                that(clientResponseMessagesSlot.captured).isEmpty()
+            }
         }
     }
 
@@ -220,7 +224,7 @@ internal class TestResponseProcessor {
 
         expect { // NOTE: Stirkt bug with comparing elements from arrays to elements from a list.
             that(receivedMessagesSlot.captured).containsExactlyInAnyOrder(receivedMessages.toList())
-            //    that(clientResponseMessagesSlot.captured).containsExactlyInAnyOrder(receivedMessages.toList())
+            that(clientResponseMessagesSlot.captured).containsExactlyInAnyOrder(receivedMessages.toList())
         }
     }
 

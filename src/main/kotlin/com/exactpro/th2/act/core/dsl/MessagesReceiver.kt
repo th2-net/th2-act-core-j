@@ -17,52 +17,77 @@
 package com.exactpro.th2.act.core.dsl
 
 import com.exactpro.th2.act.core.managers.ISubscriptionManager
-import com.exactpro.th2.act.core.monitors.IMessageResponseMonitor
-import com.exactpro.th2.act.core.monitors.MessageResponseMonitor
 import com.exactpro.th2.act.core.receivers.IMessageReceiver
-import com.exactpro.th2.act.core.rules.ICheckRule
 import com.exactpro.th2.common.grpc.*
 import com.exactpro.th2.common.schema.message.MessageListener
 import mu.KotlinLogging
+import java.util.*
 
 private val LOGGER = KotlinLogging.logger {}
 
 class MessagesReceiver(
     private val subscriptionManager: ISubscriptionManager,
-    private var monitor: IMessageResponseMonitor = MessageResponseMonitor(),
-    private val checkRule: ICheckRule
+    private val preFilterRule: PreFilterRule,
+    bufferSize: Int = 1000
 ): IMessageReceiver {
-
-    private var messageListener = createMessageListener(checkRule)
-    private var matchedMessages = mutableListOf<Message>()
+    private val messageListener = createMessageListener()
+    private val messageBuffer = MessageBuffer(bufferSize)
+    private val taskBuffer: Queue<WaitingTasksBuffer> = LinkedList()
 
     init {
         this.subscriptionManager.register(Direction.FIRST, messageListener)
         this.subscriptionManager.register(Direction.SECOND, messageListener)
     }
 
-    fun reloadMonitor(monitor: IMessageResponseMonitor){
-        this.monitor = monitor
-    }
-
-    private fun createMessageListener(checkRule: ICheckRule): MessageListener<MessageBatch> {
-        return MessageListener { tag: String, batch: MessageBatch ->
+    private fun createMessageListener(): MessageListener<MessageBatch> =
+        MessageListener { tag: String, batch: MessageBatch ->
             LOGGER.debug("Received message batch of size ${batch.serializedSize}. Consumer Tag: $tag")
             for (message in batch.messagesList) {
-                if (checkRule.onMessage(message)) {
-                    matchedMessages.add(message)
+                if (preFilterRule.onMessage(message)) {
+                    messageBuffer.add(message)
+
+                    if (taskBuffer.isNotEmpty()) {
+                        val task = taskBuffer.element()
+                        if (!task.isNotified() && task.onMessage(message)) {
+                            task.monitorResponseReceived()
+                        }
+                    }
                 }
             }
-            if (matchedMessages.isNotEmpty()) monitor.responseReceived()
         }
-    }
 
     override fun close() {
         subscriptionManager.unregister(Direction.FIRST, messageListener)
         subscriptionManager.unregister(Direction.SECOND, messageListener)
     }
 
-    override fun getResponseMessages(): List<Message> = matchedMessages
+    override fun getResponseMessages(): List<Message> = messageBuffer.getMessages()
 
-    override fun getProcessedMessageIDs(): Collection<MessageID> = checkRule.processedIDs()
+    override fun getProcessedMessageIDs(): Collection<MessageID> = preFilterRule.processedIDs()
+
+    fun incomingMessage(): List<Message> {
+        val task = taskBuffer.element()
+        if (task.isNotified()) {
+            taskBuffer.remove()
+            return listOf(task.incomingMessage())
+        }
+        return listOf()
+    }
+
+    fun bufferSearch(receiveRule: ReceiveRule): List<Message> {
+        responseMessages.forEach {
+            if (receiveRule.onMessage(it)) {
+                return listOf(it)
+            }
+        }
+        return listOf()
+    }
+
+    fun submitTask(task: WaitingTasksBuffer) {
+        taskBuffer.add(task)
+    }
+
+    fun cleanMessageBuffer(){
+        messageBuffer.removeAll()
+    }
 }

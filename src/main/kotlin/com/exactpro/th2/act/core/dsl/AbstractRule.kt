@@ -24,16 +24,13 @@ import com.google.protobuf.TextFormat
 import mu.KotlinLogging
 import java.util.ArrayList
 import java.util.concurrent.atomic.AtomicReference
+
 private val LOGGER = KotlinLogging.logger {}
 
-class CheckRule(
-    private val preFilter: (Message) -> Boolean
-):ICheckRule {
+abstract class AbstractRule: ICheckRule {
 
     private val messageIDList: MutableList<MessageID> = ArrayList()
     private val response = AtomicReference<Message?>(null)
-
-    private fun checkMessageFromConnection(message: Message): Boolean = preFilter.invoke(message)
 
     override fun onMessage(message: Message): Boolean {
         messageIDList.add(message.metadata.id)
@@ -58,4 +55,6 @@ class CheckRule(
     override fun processedIDs(): List<MessageID> = messageIDList
 
     override fun getResponse(): Message? = response.get()
+
+    protected abstract fun checkMessageFromConnection(message: Message): Boolean
 }

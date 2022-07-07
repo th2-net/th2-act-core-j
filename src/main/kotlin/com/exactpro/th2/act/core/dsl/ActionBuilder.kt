@@ -25,7 +25,8 @@ private val LOGGER = KotlinLogging.logger {}
 
 class ActionBuilder<T>(
     private val observer: StreamObserver<T>,
-    private val requestContext: RequestContext
+    private val requestContext: RequestContext,
+    private val messageBufferSize: Int
 ) {
     private var preFilter: (Message) -> Boolean = { true }
 
@@ -39,24 +40,24 @@ class ActionBuilder<T>(
     fun execute(action: Action<T>.() -> Unit) {
         val responder = Responder()
         val receiverFactory =
-            MessageReceiverFactory(requestContext.subscriptionManager, preFilter)
+            MessageReceiverFactory(requestContext.subscriptionManager, preFilter, messageBufferSize)
         val responseReceiver = ResponseReceiver(receiverFactory)
+
         try {
             action.invoke(Action(observer, requestContext, responder, responseReceiver))
             observer.onCompleted()
         } catch (ex: NoResponseFoundException) {
-            sendErrorEvent(ex)
-        } catch (ex: FailedResponseFoundException) {
-            sendErrorEvent(ex)
-        } catch (ex: Exception) {
-            LOGGER.error("Unexpected exception during action execution", ex)
+            LOGGER.error("Action did not finish correctly - ${ex.message}")
             observer.onError(ex)
+        } catch (ex: FailedResponseFoundException) {
+            requestContext.eventBatchRouter.createErrorEvent(ex.message.toString(), requestContext.parentEventID)
+            LOGGER.error("Action did not finish correctly - ${ex.message}")
+            observer.onError(ex)
+        } catch (ex: Exception) {
+            LOGGER.error("Unexpected exception during action execution - ${ex.message}")
+            observer.onError(ex)
+        } finally {
+            responseReceiver.close()
         }
-    }
-
-    private fun sendErrorEvent(ex: Exception){
-        LOGGER.error("Action did not finish correctly", ex)
-        requestContext.eventBatchRouter.createErrorEvent(ex.message.toString(), requestContext.parentEventID)
-        observer.onError(ex)
     }
 }

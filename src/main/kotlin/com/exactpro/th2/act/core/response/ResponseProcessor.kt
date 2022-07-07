@@ -16,7 +16,7 @@
 
 package com.exactpro.th2.act.core.response
 
-import com.exactpro.th2.act.core.dsl.ReceiveBuilder
+import com.exactpro.th2.act.core.dsl.NoResponseFoundException
 import com.exactpro.th2.act.core.messages.MessageMapping
 import com.exactpro.th2.act.core.requests.RequestContext
 import com.exactpro.th2.common.grpc.Message
@@ -28,10 +28,7 @@ private val LOGGER = KotlinLogging.logger {}
 
 class ResponseProcessor(
     private val expectedMessages: Collection<MessageMapping>,
-    private val noResponseBodyFactory: IBodyDataFactory,
-    private val responderMessage: List<Message> = listOf(),
-    private val filterReceive: ReceiveBuilder.() -> ReceiveBuilder = { ReceiveBuilder() },
-    private var filter: ((Message) -> Boolean) = { true }
+    private val noResponseBodyFactory: IBodyDataFactory
 ): IResponseProcessor {
 
     override fun process(
@@ -49,6 +46,7 @@ class ResponseProcessor(
                 parentEventID = requestContext.parentEventID
             )
             status = RequestStatus.Status.ERROR
+            throw NoResponseFoundException("Unexpected behavior. The message to receive was not found.")
         } else {
             val responseMessageTypes = responseMessages.map { it.metadata.messageType }
             val matchingMapping = expectedMessages.find { it.matches(responseMessageTypes) }
@@ -71,21 +69,7 @@ class ResponseProcessor(
         }
 
         if (!responder.isResponseSent) {
-            val matchedMessages = mutableListOf<Message>()
-            for (msg in responseMessages) {
-                if (ReceiveBuilder(msg).let(filterReceive).filterAvailability()){
-                    matchedMessages.addAll(responseMessages)
-                    break
-                }
-                if (ReceiveBuilder(msg).let(filterReceive).getStatus()
-                    && filter.invoke(msg)
-                    && !responderMessage.contains(msg)
-                ) {
-                    matchedMessages.add(msg)
-                    break
-                }
-            }
-            responder.onResponseFound(status, requestContext.checkpoint, matchedMessages)
+            responder.onResponseFound(status, requestContext.checkpoint, responseMessages)
         } else {
             LOGGER.warn {
                 """Could not send response to client as one was already sent.

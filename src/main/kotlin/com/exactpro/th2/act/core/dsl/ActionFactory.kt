@@ -36,7 +36,8 @@ class ActionFactory(
         rpcName: String,
         requestName: String,
         parentEventID: EventID,
-        timeout: Long = Context.current().deadline.timeRemaining(MILLISECONDS)
+        timeout: Long = Context.current().deadline.timeRemaining(MILLISECONDS),
+        messageBufferSize: Int = 1000
     ): ActionBuilder<T> {
         val requestContext = RequestContext(
             rpcName,
@@ -49,6 +50,6 @@ class ActionFactory(
             timeout
         )
 
-        return ActionBuilder(observer, requestContext)
+        return ActionBuilder(observer, requestContext, messageBufferSize)
     }
 }

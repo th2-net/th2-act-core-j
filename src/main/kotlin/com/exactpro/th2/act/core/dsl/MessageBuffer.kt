@@ -16,19 +16,18 @@
 
 package com.exactpro.th2.act.core.dsl
 
-import com.exactpro.th2.act.core.managers.ISubscriptionManager
 import com.exactpro.th2.common.grpc.Message
+import java.util.*
 
-class MessageReceiverFactory(
-    private val subscriptionManager: ISubscriptionManager,
-    private val preFilter: (Message) -> Boolean,
-    private val messageBufferSize: Int
-) {
-    fun from(): MessagesReceiver {
-        return MessagesReceiver(
-            subscriptionManager,
-            PreFilterRule(preFilter),
-            messageBufferSize
-        )
+class MessageBuffer(private val bufferSize: Int = 1000) {
+    private val messageBuffer: Queue<Message> = LinkedList()
+
+    fun getMessages(): List<Message> = messageBuffer.toTypedArray().toList()
+
+    fun add(msg: Message) {
+        if (messageBuffer.size < bufferSize)
+            messageBuffer.add(msg)
     }
+
+    fun removeAll() = messageBuffer.clear()
 }

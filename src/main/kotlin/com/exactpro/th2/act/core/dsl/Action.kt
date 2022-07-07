@@ -28,6 +28,7 @@ import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.message.direction
 import com.exactpro.th2.common.message.messageType
+import com.exactpro.th2.common.message.sequence
 import com.exactpro.th2.common.message.sessionAlias
 import io.grpc.stub.StreamObserver
 import mu.KotlinLogging
@@ -41,6 +42,7 @@ class Action<T>(
     private val responseReceiver: ResponseReceiver
 ) {
     private val requestMessageSubmitter = RequestMessageSubmitter()
+    private var seqNumPreviousMessage = Long.MAX_VALUE
 
     fun send(
         message: Message,
@@ -52,7 +54,8 @@ class Action<T>(
         checkingContext()
 
         if (cleanBuffer) {
-            responder.cleanResponseMessages()
+            responseReceiver.cleanMessageBuffer()
+            seqNumPreviousMessage = Long.MAX_VALUE
         }
 
         val request = Request(message)
@@ -78,10 +81,8 @@ class Action<T>(
 
         val responseProcessor = ResponseProcessor(
             listOf(MessageMapping(listOf(msgType), false, StatusMapping.PASSED)),
-            NoResponseBodyFactory(msgType),
-            responder.getResponseMessages(),
-            filter
-        ) { msg: Message -> msg.sessionAlias == sessionAlias && msg.direction == direction }
+            NoResponseBodyFactory(msgType)
+        )
 
         val remainingTime = requestContext.remainingTime
         val deadline: Long =
@@ -91,13 +92,18 @@ class Action<T>(
                 remainingTime
             }
 
-        responseReceiver.handle(responder, requestContext, responseProcessor, deadline)
-
-        if (responder.isMessageNotFound()) {
-            throw NoResponseFoundException("Unexpected behavior. The message to receive was not found.")
+        val receiveRule = ReceiveRule(filter){
+                msg: Message -> msg.sessionAlias == sessionAlias
+                && msg.direction == direction
+                && msg.sequence < seqNumPreviousMessage
         }
 
-        return responder.getResponseMessages().last()
+        responseReceiver.handle(responder, requestContext, responseProcessor, deadline, receiveRule)
+
+        val responseMessage = responder.getResponseMessages()[0]
+        seqNumPreviousMessage = responseMessage.sequence
+
+        return responseMessage
     }
 
     fun repeat(func: () -> Message): () -> Message = func

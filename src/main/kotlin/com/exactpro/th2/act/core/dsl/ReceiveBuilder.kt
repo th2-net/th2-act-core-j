@@ -23,23 +23,11 @@ enum class StatusReceiveBuilder(val value: Boolean) {
     FAILED(false)
 }
 
-class ReceiveBuilder {
+class ReceiveBuilder(private val message: Message) {
     private val fail = StatusReceiveBuilder.FAILED
     private val pass = StatusReceiveBuilder.PASSED
 
-    private lateinit var message: Message
     private var status: Boolean = true
-    private var noFilter: Boolean = false
-
-    constructor(message: Message){
-        this.message = message
-    }
-
-    constructor(){
-        noFilter = true
-    }
-
-    fun filterAvailability(): Boolean = noFilter
 
     fun getStatus(): Boolean = status
 
