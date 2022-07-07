@@ -206,7 +206,7 @@ class TestDSL {
     fun `case two`() {
         val result = Message.newBuilder()
         val messages = mutableListOf<Message>()
-        for (it in 5L downTo 1L) {
+        for (it in 1L..5L) {
             messages.add(
                 messageBuild("NewOrderSingle", "sessionAlias", Direction.FIRST, it).build()
             )
@@ -234,7 +234,7 @@ class TestDSL {
                                 }
                             }
                         } until { mes ->
-                            mes.sequence != 4L
+                            mes.sequence != 2L
                         }
 
                     resultMessages.forEach {
@@ -256,7 +256,7 @@ class TestDSL {
         var segmentNum = 4
 
         val expectedMessages = mutableListOf<Message>()
-        for (it in 4 downTo 0) {
+        for (it in 0..4) {
             expectedMessages.add(updateDQ126(createDQ126(), it.toString()))
         }
 
@@ -326,8 +326,8 @@ class TestDSL {
     fun `case four`() {
         val result = Message.newBuilder()
         val messages = listOf(
-            messageBuild("BusinessMessageReject", "sessionAlias", Direction.SECOND, 2L).build(),
-            messageBuild("BusinessMessageReject", "sessionAlias", Direction.FIRST, 1L).build()
+            messageBuild("BusinessMessageReject", "sessionAlias", Direction.SECOND, 1L).build(),
+            messageBuild("BusinessMessageReject", "sessionAlias", Direction.FIRST, 2L).build()
         )
 
         actionFactory.apply {
@@ -341,7 +341,7 @@ class TestDSL {
                     assertEquals(messages[0], echoMessage)
 
                     val message = receive("BusinessMessageReject", 1000, "sessionAlias", Direction.FIRST) {
-                        passOn("BusinessMessageReject") { this.sequence == 1L }
+                        passOn("BusinessMessageReject") { this.sequence == 2L }
                         failOn("BusinessMessageReject") { this.sequence == 3L }
                     }
                     emitResult(result.addField("Received a BusinessMessageReject message", message).build())
@@ -355,8 +355,8 @@ class TestDSL {
     fun `case five`() {
         val result = Message.newBuilder()
         val messages = listOf(
-            messageBuild("NewOrderSingle", "sessionAlias", Direction.FIRST, 2L).build(),
-            messageBuild("OrderCancelReplaceRequest", "sessionAlias", Direction.FIRST, 1L).build()
+            messageBuild("NewOrderSingle", "sessionAlias", Direction.FIRST, 1L).build(),
+            messageBuild("OrderCancelReplaceRequest", "sessionAlias", Direction.FIRST, 2L).build()
         )
 
         actionFactory.apply {
@@ -368,8 +368,8 @@ class TestDSL {
                     send(messages[0], "sessionAlias", 1000, cleanBuffer = false)
 
                     var message = receive("NewOrderSingle", 1000, "sessionAlias", Direction.FIRST) {
-                        passOn("NewOrderSingle") { this.sequence == 2L }
-                        failOn("NewOrderSingle") { this.sequence == 1L }
+                        passOn("NewOrderSingle") { this.sequence == 1L }
+                        failOn("NewOrderSingle") { this.sequence == 2L }
                     }
                     emitResult(result.addField("Received a NewOrderSingle message", message).build())
                     assertEquals(messages[0], message)
@@ -377,8 +377,8 @@ class TestDSL {
                     send(messages[1], "sessionAlias", 1000, cleanBuffer = false)
 
                     message = receive("OrderCancelReplaceRequest", 1000, "sessionAlias", Direction.FIRST) {
-                        passOn("OrderCancelReplaceRequest") { this.sequence == 1L }
-                        failOn("OrderCancelReplaceRequest") { this.sequence == 2L }
+                        passOn("OrderCancelReplaceRequest") { this.sequence == 2L }
+                        failOn("OrderCancelReplaceRequest") { this.sequence == 1L }
                     }
                     emitResult(message)
 

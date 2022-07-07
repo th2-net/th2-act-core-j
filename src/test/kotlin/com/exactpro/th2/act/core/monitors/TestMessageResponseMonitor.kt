@@ -91,7 +91,7 @@ internal class TestMessageResponseMonitor {
         val elapsedTime = measureTimeMillis { responseMonitor.await(100, TimeUnit.MILLISECONDS) }
 
         expect {
-            that(elapsedTime).isGreaterThan(100L)
+            that(elapsedTime).isGreaterThanOrEqualTo(100L)
         }
     }
 }
