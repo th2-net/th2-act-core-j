@@ -29,19 +29,11 @@ class WaitingTasksBuffer(
     private val timeout: Long,
     private val monitor: IResponseMonitor
 ) {
+    val foundFailOn: Boolean
+        get() = receiveRule.statusReceive
 
-    private var status = true
-    fun getStatusReceive(): Boolean = status
-
-    fun matchMessage(message: Message): Boolean {
-        val match = receiveRule.onMessage(message)
-        if(!match){
-            if(receiveRule.statusReceive){
-                status = false
-            }
-        }
-        return match
-    }
+    fun matchMessage(message: Message): Boolean =
+        receiveRule.onMessage(message)
 
     fun responseReceived(message: Message) {
         monitor.responseMatch(message)

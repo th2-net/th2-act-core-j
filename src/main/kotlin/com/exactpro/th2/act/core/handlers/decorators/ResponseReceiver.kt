@@ -37,7 +37,7 @@ class ResponseReceiver(private val messagesReceiver: MessagesReceiver) {
         messagesReceiver.submitTask(task)
         task.await()
 
-        if(!task.getStatusReceive()){
+        if(task.foundFailOn){
             requestContext.eventBatchRouter.createErrorEvent("Found a message for failOn.", requestContext.parentEventID)
             throw FailedResponseFoundException("Found a message for failOn.")
         }

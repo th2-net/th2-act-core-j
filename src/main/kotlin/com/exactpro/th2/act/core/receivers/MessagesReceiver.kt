@@ -93,7 +93,7 @@ class MessagesReceiver(
     private fun checkMessage(task: WaitingTasksBuffer, message: Message): Boolean {
         if (task.isNotified) return true
 
-        if (task.matchMessage(message) || !task.getStatusReceive()) {
+        if (task.matchMessage(message) || task.foundFailOn) {
             task.responseReceived(message)
             return task.isNotified // found all responses
         }

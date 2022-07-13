@@ -34,12 +34,12 @@ class ReceiveBuilder(private val message: Message) {
 
     fun getStatus(): StatusReceiveBuilder = status
 
-    private val msgTypes: MutableList<IMessageType> = mutableListOf()
+    private val msgTypes = HashSet<IMessageType>()
 
-    fun messageTypes(): List<IMessageType> = msgTypes
+    fun messageTypes(): List<IMessageType> = msgTypes.toList()
 
     fun passOn(msgType: String, filter: Message.() -> Boolean): ReceiveBuilder {
-        if (!msgTypes.contains(IMessageType { msgType })) msgTypes.add(IMessageType { msgType })
+        msgTypes.add(IMessageType { msgType })
 
         status = if (message.metadata.messageType == msgType && filter.invoke(message)) pass
         else other
@@ -47,7 +47,7 @@ class ReceiveBuilder(private val message: Message) {
     }
 
     fun failOn(msgType: String, filter: Message.() -> Boolean): ReceiveBuilder {
-        if (!msgTypes.contains(IMessageType { msgType })) msgTypes.add(IMessageType { msgType })
+        msgTypes.add(IMessageType { msgType })
 
         if (message.metadata.messageType == msgType && filter.invoke(message)) {
             status = fail
