@@ -19,7 +19,6 @@ package com.exactpro.th2.act.core.handlers
 import com.exactpro.th2.act.core.managers.SubscriptionManager
 import com.exactpro.th2.act.core.requests.IRequest
 import com.exactpro.th2.act.core.requests.RequestContext
-import com.exactpro.th2.act.core.response.IResponder
 import com.exactpro.th2.act.core.routers.EventRouter
 import com.exactpro.th2.act.core.routers.EventSubmissionException
 import com.exactpro.th2.act.core.routers.MessageRouter
@@ -28,7 +27,6 @@ import com.exactpro.th2.act.randomRequest
 import com.exactpro.th2.act.randomString
 import com.exactpro.th2.act.toEventID
 import com.exactpro.th2.common.grpc.Checkpoint
-import com.exactpro.th2.common.grpc.RequestStatus
 import io.mockk.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -64,7 +62,6 @@ internal class TestRequestMessageSubmitter {
 
     private lateinit var messageSubmitter: RequestMessageSubmitter
     private lateinit var request: IRequest
-    private lateinit var responder: IResponder
     private lateinit var messageRouter: MessageRouter
     private lateinit var eventRouter: EventRouter
     private lateinit var nextHandler: IRequestHandler
@@ -74,7 +71,6 @@ internal class TestRequestMessageSubmitter {
     internal fun setUp() {
         messageSubmitter = RequestMessageSubmitter()
         request = randomRequest()
-        responder = mockk { }
         nextHandler = mockk { }
 
         messageRouter = mockk {
@@ -90,14 +86,14 @@ internal class TestRequestMessageSubmitter {
 
     @Test
     fun `test should submit message to message router`() {
-        messageSubmitter.handle(request, responder, requestContext)
+        messageSubmitter.handle(request, requestContext)
 
         verify { messageRouter.sendMessage(request.requestMessage, parentEventID = requestContext.parentEventID) }
     }
 
     @Test
     fun `test should submit send message event to event router`() {
-        messageSubmitter.handle(request, responder, requestContext)
+        messageSubmitter.handle(request, requestContext)
 
         verify {
             eventRouter.createSendMessageEvent(request.requestMessage, parentEventID = requestContext.parentEventID)
@@ -108,61 +104,54 @@ internal class TestRequestMessageSubmitter {
     fun `test should pass request to next handler`() {
         val nextHandler: IRequestHandler = mockk(relaxUnitFun = true) { }
 
-        messageSubmitter.chain(nextHandler).handle(request, responder, requestContext)
+        messageSubmitter.chain(nextHandler).handle(request, requestContext)
 
-        verify { nextHandler.handle(request, responder, requestContext) }
+        verify { nextHandler.handle(request, requestContext) }
     }
 
     @Test
     fun `test should send error response to in case of a message submission error`() {
         val nextHandler: IRequestHandler = mockk(relaxUnitFun = true) { }
 
-        every { responder.onError(any()) } just Runs
         every { messageRouter.sendMessage(any(), any(), any()) } throws MessageSubmissionException()
 
-        messageSubmitter.chain(nextHandler).handle(request, responder, requestContext)
+        messageSubmitter.chain(nextHandler).handle(request, requestContext)
 
-        verify { responder.onError(any()) }
-        verify(exactly = 0) { nextHandler.handle(any(), any(), any()) }
+        verify(exactly = 0) { nextHandler.handle(any(), any()) }
     }
 
     @Test
     fun `test should send error response to in case of an event submission error`() {
         val nextHandler: IRequestHandler = mockk(relaxUnitFun = true) { }
 
-        every { responder.onError(any()) } just Runs
         every { eventRouter.createSendMessageEvent(any(), any()) } throws EventSubmissionException()
 
-        messageSubmitter.chain(nextHandler).handle(request, responder, requestContext)
+        messageSubmitter.chain(nextHandler).handle(request, requestContext)
 
-        verify { responder.onError(any()) }
-        verify(exactly = 0) { nextHandler.handle(any(), any(), any()) }
+        verify(exactly = 0) { nextHandler.handle(any(), any()) }
     }
 
     @Test
     fun `test should send success response to client`() {
-        val messageSubmitter = RequestMessageSubmitter(respondOnSuccess = true)
+        val messageSubmitter = RequestMessageSubmitter()
         val nextHandler: IRequestHandler = mockk(relaxUnitFun = true) { }
 
-        every { responder.onResponseFound(any(), any(), any()) } just Runs
         every { eventRouter.createSendMessageEvent(any(), any()) } answers { randomString().toEventID() }
 
-        messageSubmitter.chain(nextHandler).handle(request, responder, requestContext)
+        messageSubmitter.chain(nextHandler).handle(request, requestContext)
 
-        verify { nextHandler.handle(request, responder, requestContext) }
-        verify { responder.onResponseFound(RequestStatus.Status.SUCCESS, requestContext.checkpoint, listOf()) }
+        verify { nextHandler.handle(request, requestContext) }
     }
 
     @Test
     fun `test should not send success response to client when flag isn't set`() {
-        val messageSubmitter = RequestMessageSubmitter(respondOnSuccess = false)
+        val messageSubmitter = RequestMessageSubmitter()
         val nextHandler: IRequestHandler = mockk(relaxUnitFun = true) { }
 
         every { eventRouter.createSendMessageEvent(any(), any()) } answers { randomString().toEventID() }
 
-        messageSubmitter.chain(nextHandler).handle(request, responder, requestContext)
+        messageSubmitter.chain(nextHandler).handle(request, requestContext)
 
-        verify { nextHandler.handle(request, responder, requestContext) }
-        verify(exactly = 0) { responder.onResponseFound(any(), any(), any()) }
+        verify { nextHandler.handle(request, requestContext) }
     }
 }

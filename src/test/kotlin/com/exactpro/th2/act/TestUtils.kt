@@ -16,7 +16,6 @@
 
 package com.exactpro.th2.act
 
-import com.exactpro.th2.act.core.handlers.validations.MessageTypeValidation
 import com.exactpro.th2.act.core.messages.IField
 import com.exactpro.th2.act.core.messages.IMessageType
 import com.exactpro.th2.act.core.requests.IRequest
@@ -181,11 +180,6 @@ fun IMessageType.toRandomMessage(
 }
 
 /**
- * Creates a [MessageTypeValidation] from this message type.
- */
-fun IMessageType.toValidation(): MessageTypeValidation = MessageTypeValidation(this)
-
-/**
  * Returns a [MessageFieldsCheckRule] for this connection ID and the specified [MessageFields].
  */
 fun ConnectionID.toMessageFieldsCheckRule(vararg messageFields: MessageFields): MessageFieldsCheckRule {
@@ -207,11 +201,6 @@ fun ConnectionID.toRandomMessageFieldsCheckRule(messageFieldsCount: Int = 10): M
  * Returns a new [MessageBatch] only consisting of this message.
  */
 fun Message.toBatch(): MessageBatch = MessageBatch.newBuilder().addMessages(this).build()
-
-/**
- * Returns a new [MessageBatch] only consisting of all messages in this collection.
- */
-fun Collection<Message>.toBatch(): MessageBatch = MessageBatch.newBuilder().addAllMessages(this).build()
 
 /**
  * Creates an [EventID] from this string.
@@ -245,18 +234,6 @@ fun randomMessage(connectionID: ConnectionID = randomConnectionID(),
                   direction: Direction? = null,
                   parentEventID: EventID? = null): Message {
     return randomMessageType().toRandomMessage(connectionID, direction = direction, parentEventID = parentEventID)
-}
-
-/**
- * Returns a random [Message]. The direction of the message and additional message fields can optionally be specified.
- */
-fun randomMessage(connectionID: ConnectionID = randomConnectionID(),
-                  direction: Direction? = null,
-                  fields: Collection<Pair<IField, String>>): Message {
-
-    return randomMessageType().toMessage(connectionID = connectionID,
-                                         fields = 10.randomFields().plus(fields).toMap(),
-                                         direction = direction ?: randomDirection())
 }
 
 /**

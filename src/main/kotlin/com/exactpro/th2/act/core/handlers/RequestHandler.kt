@@ -18,7 +18,6 @@ package com.exactpro.th2.act.core.handlers
 
 import com.exactpro.th2.act.core.requests.IRequest
 import com.exactpro.th2.act.core.requests.RequestContext
-import com.exactpro.th2.act.core.response.IResponder
 
 abstract class RequestHandler: IRequestHandler {
 
@@ -43,10 +42,10 @@ abstract class RequestHandler: IRequestHandler {
     }
 
     /**
-     * Passes the received [IRequest], [IResponder] and [RequestContext] to the next handler in the chain.
+     * Passes the received [IRequest], and [RequestContext] to the next handler in the chain.
      */
-    protected fun toNextHandler(request: IRequest, responder: IResponder, requestContext: RequestContext) {
-        nextHandler?.handle(request, responder, requestContext)
+    protected fun toNextHandler(request: IRequest, requestContext: RequestContext) {
+        nextHandler?.handle(request, requestContext)
     }
 
     companion object {
@@ -55,7 +54,7 @@ abstract class RequestHandler: IRequestHandler {
          */
         @JvmStatic
         fun chained(firstHandler: IRequestHandler, vararg otherHandlers: IRequestHandler): IRequestHandler {
-            otherHandlers.fold(firstHandler, { previous, current -> current.also { previous.chain(it) }})
+            otherHandlers.fold(firstHandler) { previous, current -> current.also { previous.chain(it) } }
             return firstHandler
         }
     }

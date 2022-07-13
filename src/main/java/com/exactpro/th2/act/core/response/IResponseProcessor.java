@@ -30,11 +30,9 @@ public interface IResponseProcessor {
      * @param responseMessages    A {@link List} of received messages as {@link Message} objects.
      * @param processedMessageIDs A {@link Collection} of {@link MessageID}s of all messages processed while
      *                            anticipating the system's response.
-     * @param responder           The {@link IResponder} to be used to send a response to the client.
      * @param requestContext      The {@link RequestContext} of the request for which these messages are being processed.
      */
     void process(List<Message> responseMessages,
                  Collection<MessageID> processedMessageIDs,
-                 IResponder responder,
                  RequestContext requestContext);
 }

@@ -17,7 +17,7 @@
 package com.exactpro.th2.act.core.response
 
 import com.exactpro.th2.act.*
-import com.exactpro.th2.act.core.dsl.NoResponseFoundException
+import com.exactpro.th2.act.core.action.NoResponseFoundException
 import com.exactpro.th2.act.core.managers.SubscriptionManager
 import com.exactpro.th2.act.core.messages.failedOn
 import com.exactpro.th2.act.core.messages.passedOn
@@ -64,13 +64,11 @@ internal class TestResponseProcessor {
         1_000
     )
 
-    private lateinit var responder: IResponder
     private lateinit var eventRouter: EventRouter
     private lateinit var requestContext: RequestContext
 
     @BeforeEach
     internal fun setUp() {
-        responder = mockk { }
         eventRouter = mockk { }
 
         requestContext = createRequestContext(eventRouter)
@@ -103,20 +101,15 @@ internal class TestResponseProcessor {
 
         val processedMessages = 5 of { randomMessage() }
         val receivedMessage = TestMessageType.REJECT.toRandomMessage()
-
-        every { responder.isResponseSent } returns false andThen true
-        every { responder.onResponseFound(any(), any(), any()) } just Runs
         every { eventRouter.createResponseReceivedEvents(any(), any(), any()) } answers { randomString().toEventID() }
 
         responseProcessor.process(
             responseMessages = listOf(receivedMessage),
             processedMessageIDs = processedMessages.plus(receivedMessage).map { it.metadata.id },
-            responder = responder,
             requestContext = requestContext
         )
 
         val responseMessagesSlot = slot<List<Message>>()
-        val clientResponseMessagesSlot = slot<List<Message>>()
 
         verify {
             eventRouter.createResponseReceivedEvents(
@@ -125,15 +118,9 @@ internal class TestResponseProcessor {
                 parentEventID = requestContext.parentEventID
             )
         }
-        verify {
-            responder.onResponseFound(
-                requestStatus, requestContext.checkpoint, capture(clientResponseMessagesSlot)
-            )
-        }
 
         expect {
             that(responseMessagesSlot.captured).containsExactly(receivedMessage)
-            that(clientResponseMessagesSlot.captured).containsExactly(receivedMessage)
         }
     }
 
@@ -148,15 +135,12 @@ internal class TestResponseProcessor {
 
         val processedMessages = 5 of { randomMessage() }
 
-        every { responder.isResponseSent } returns false andThen true
-        every { responder.onResponseFound(any(), any(), any()) } just Runs
         every { eventRouter.createNoResponseEvent(any(), any(), any()) } answers { randomString().toEventID() }
 
         assertThrows(NoResponseFoundException::class.java) {
             responseProcessor.process(
                 responseMessages = emptyList(),
                 processedMessageIDs = processedMessages.map { it.metadata.id },
-                responder = responder,
                 requestContext = requestContext
             )
 
@@ -168,11 +152,6 @@ internal class TestResponseProcessor {
                     noResponseBodyFactory = noResponseBodyFactory,
                     processedMessageIDs = capture(processedMessageIDsSlot),
                     parentEventID = requestContext.parentEventID
-                )
-            }
-            verify {
-                responder.onResponseFound(
-                    RequestStatus.Status.ERROR, requestContext.checkpoint, capture(clientResponseMessagesSlot)
                 )
             }
 
@@ -195,19 +174,15 @@ internal class TestResponseProcessor {
         val processedMessages = 5 of { randomMessage() }
         val receivedMessages = 5 of { randomMessage() }
 
-        every { responder.isResponseSent } returns false andThen true
-        every { responder.onResponseFound(any(), any(), any()) } just Runs
         every { eventRouter.createNoMappingEvent(any(), any(), any()) } answers { randomString().toEventID() }
 
         responseProcessor.process(
             responseMessages = receivedMessages.toList(),
             processedMessageIDs = processedMessages.plus(receivedMessages).map { it.metadata.id },
-            responder = responder,
             requestContext = requestContext
         )
 
         val receivedMessagesSlot = slot<List<Message>>()
-        val clientResponseMessagesSlot = slot<List<Message>>()
 
         verify {
             eventRouter.createNoMappingEvent(
@@ -216,15 +191,9 @@ internal class TestResponseProcessor {
                 parentEventID = requestContext.parentEventID
             )
         }
-        verify {
-            responder.onResponseFound(
-                RequestStatus.Status.ERROR, requestContext.checkpoint, capture(clientResponseMessagesSlot)
-            )
-        }
 
         expect { // NOTE: Stirkt bug with comparing elements from arrays to elements from a list.
             that(receivedMessagesSlot.captured).containsExactlyInAnyOrder(receivedMessages.toList())
-            that(clientResponseMessagesSlot.captured).containsExactlyInAnyOrder(receivedMessages.toList())
         }
     }
 
@@ -237,18 +206,13 @@ internal class TestResponseProcessor {
 
         val receivedMessage = TestMessageType.REJECT.toRandomMessage()
 
-        every { responder.isResponseSent } returns true
         every { eventRouter.createResponseReceivedEvents(any(), any(), any()) } answers { randomString().toEventID() }
 
         responseProcessor.process(
             listOf(receivedMessage),
             processedMessageIDs = listOf(receivedMessage.metadata.id),
-            responder = responder,
             requestContext = requestContext
         )
-
-        verify(exactly = 0) { responder.onResponseFound(any(), any(), any()) }
-        verify(exactly = 0) { responder.onError(any()) }
     }
 
     /* TODO: Add similar scenarios with when there's:

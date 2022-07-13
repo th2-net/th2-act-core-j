@@ -18,7 +18,6 @@ package com.exactpro.th2.act.core.handlers
 
 import com.exactpro.th2.act.core.requests.IRequest
 import com.exactpro.th2.act.core.requests.RequestContext
-import com.exactpro.th2.act.core.response.IResponder
 import com.exactpro.th2.act.stubs.fail
 import io.mockk.spyk
 import org.junit.jupiter.api.Test
@@ -44,7 +43,7 @@ internal class TestRequestHandler {
 
         // ---------------------------------------------------------------------------------------------------------- //
 
-        override fun handle(request: IRequest, responder: IResponder, requestContext: RequestContext) = fail()
+        override fun handle(request: IRequest, requestContext: RequestContext) = fail()
     }
 
     @Test

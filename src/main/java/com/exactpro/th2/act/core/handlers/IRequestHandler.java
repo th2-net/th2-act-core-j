@@ -18,7 +18,6 @@ package com.exactpro.th2.act.core.handlers;
 
 import com.exactpro.th2.act.core.requests.IRequest;
 import com.exactpro.th2.act.core.requests.RequestContext;
-import com.exactpro.th2.act.core.response.IResponder;
 
 public interface IRequestHandler {
     /**
@@ -34,8 +33,7 @@ public interface IRequestHandler {
      * handler may choose to not propagate the request further.
      *
      * @param request        The request to be handled as a {@link IRequest}.
-     * @param responder      The responder for returning a response to the client as a {@link IResponder}.
      * @param requestContext The {@link RequestContext} for handling the request.
      */
-    void handle(IRequest request, IResponder responder, RequestContext requestContext);
+    void handle(IRequest request, RequestContext requestContext);
 }

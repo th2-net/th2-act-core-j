@@ -18,17 +18,15 @@ package com.exactpro.th2.act.core.handlers
 
 import com.exactpro.th2.act.core.requests.IRequest
 import com.exactpro.th2.act.core.requests.RequestContext
-import com.exactpro.th2.act.core.response.IResponder
 import com.exactpro.th2.act.core.routers.EventSubmissionException
 import com.exactpro.th2.act.core.routers.MessageSubmissionException
-import com.exactpro.th2.common.grpc.RequestStatus
 import mu.KotlinLogging
 
 private val LOGGER = KotlinLogging.logger {}
 
-class RequestMessageSubmitter(private val respondOnSuccess: Boolean = false): RequestHandler() {
+class RequestMessageSubmitter: RequestHandler() {
 
-    override fun handle(request: IRequest, responder: IResponder, requestContext: RequestContext) {
+    override fun handle(request: IRequest, requestContext: RequestContext) {
 
         try {
             requestContext.messageBatchRouter.sendMessage(
@@ -40,18 +38,12 @@ class RequestMessageSubmitter(private val respondOnSuccess: Boolean = false): Re
                 parentEventID = requestContext.parentEventID
             )
 
-            super.toNextHandler(request, responder, requestContext)
-
-            if (respondOnSuccess) {
-                responder.onResponseFound(RequestStatus.Status.SUCCESS, requestContext.checkpoint, listOf())
-            }
+            super.toNextHandler(request, requestContext)
 
         } catch (e: MessageSubmissionException) {
             LOGGER.error("Failed to submit a message.", e)
-            responder.onError("Failed to submit a message: ${e.message}")
         } catch (e: EventSubmissionException) {
             LOGGER.error("Failed to submit a \"Send Message\" Event.", e)
-            responder.onError("Failed to submit a \"Send Message\" Event: ${e.message}")
         }
     }
 }

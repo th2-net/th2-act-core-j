@@ -17,11 +17,10 @@
 package com.exactpro.th2.act.core.messages
 
 import com.exactpro.th2.common.event.Event
-import com.exactpro.th2.common.grpc.RequestStatus
 
-enum class StatusMapping(val eventStatus: Event.Status, val requestStatus: RequestStatus.Status) {
-    FAILED(Event.Status.FAILED, RequestStatus.Status.ERROR),
-    PASSED(Event.Status.PASSED, RequestStatus.Status.SUCCESS);
+enum class StatusMapping(val eventStatus: Event.Status) {
+    FAILED(Event.Status.FAILED),
+    PASSED(Event.Status.PASSED);
 }
 
 class MessageMapping(

@@ -24,6 +24,7 @@ import com.exactpro.th2.common.grpc.ListValue
 import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.grpc.MessageMetadata
 import com.exactpro.th2.common.message.messageType
+import com.exactpro.th2.common.value.add
 import com.exactpro.th2.common.value.toValue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
@@ -70,7 +71,7 @@ internal class TestMessageBuilder {
     fun `test should add correct message type to the message metadata`(messageType: IMessageType) {
         val messageFromType = MessageBuilder create {
             metadata {
-                withMessageType(messageType)
+                this.messageType = messageType.typeName
             }
             body {
                 repeat(10) {
@@ -81,7 +82,7 @@ internal class TestMessageBuilder {
 
         val messageFromString = MessageBuilder create {
             metadata {
-                withMessageType(messageType.typeName)
+                this.messageType = messageType.typeName
             }
             body {
                 repeat(10) {
@@ -99,7 +100,7 @@ internal class TestMessageBuilder {
     fun `test should add correct body and metadata`() {
         val message = MessageBuilder create {
             metadata {
-                withMessageType("SomeType")
+                messageType = "SomeType"
             }
             body {
                 TestField.ORDER_QTY toValue 23000
@@ -180,8 +181,8 @@ internal class TestMessageBuilder {
                     add {
                         "RandomField" toValue 1.123
                     }
-                    add ("Some Value Here")
-                    add (112.23)
+                    add("Some Value Here")
+                    add(112.23)
                 }
                 "TestField" toList {
                     add {
@@ -194,21 +195,23 @@ internal class TestMessageBuilder {
         val expectedMessage = Message.newBuilder().putAllFields(
             mapOf(
                 TestField.ORDER_QTY.fieldName to "23000".toValue(),
-                TestField.NO_PARTY_IDS.fieldName to ListValue.newBuilder().addAllValues(listOf(
-                    Message.newBuilder().putAllFields(
-                        mapOf(
-                            TestField.PRICE.fieldName to "122.123".toValue(),
-                            TestField.CLIENT_ORDER_ID.fieldName to "Some ID".toValue()
-                        )
-                    ).build().toValue(),
-                    Message.newBuilder().putAllFields(
-                        mapOf(
-                            "RandomField" to 1.123.toValue()
-                        )
-                    ).build().toValue(),
-                    "Some Value Here".toValue(),
-                    112.23.toValue()
-                )).build().toValue(),
+                TestField.NO_PARTY_IDS.fieldName to ListValue.newBuilder().addAllValues(
+                    listOf(
+                        Message.newBuilder().putAllFields(
+                            mapOf(
+                                TestField.PRICE.fieldName to "122.123".toValue(),
+                                TestField.CLIENT_ORDER_ID.fieldName to "Some ID".toValue()
+                            )
+                        ).build().toValue(),
+                        Message.newBuilder().putAllFields(
+                            mapOf(
+                                "RandomField" to 1.123.toValue()
+                            )
+                        ).build().toValue(),
+                        "Some Value Here".toValue(),
+                        112.23.toValue()
+                    )
+                ).build().toValue(),
                 "TestField" to ListValue.newBuilder().addValues(
                     Message.newBuilder().putAllFields(
                         mapOf(
@@ -261,6 +264,89 @@ internal class TestMessageBuilder {
                 ).build().toValue()
             )
         ).build()
+
+        expect {
+            that(message).isEqualTo(expectedMessage)
+        }
+    }
+
+    @Test
+    fun `test messageBuilder`() {
+        val message = message {
+            metadata {
+                messageType = "MessageType"
+                protocol = "fix"
+                addProperty("name", "value")
+            }
+            body {
+                "field" to "simple value"
+                "complex" to message {
+                    "field" to 1
+                }
+                "collection" to list[1, 2, 3, 4]
+                "complexCollection" to list[
+                        message {
+                            "field" to 'a'
+                        },
+                        message {
+                            "field" to 'b'
+                        }
+                ]
+                "anotherCollection" buildList {
+                    addMessage {
+                        "a" to 'b'
+                    }
+
+                    addMessage {
+                        "a" to 'c'
+                    }
+                }
+
+                "anotherAnotherCollection" buildList {
+                    addValue("a")
+                    addValue("c")
+                }
+            }
+        }
+
+        val expectedMessage =
+            Message.newBuilder()
+                .setMetadata(
+                    MessageMetadata.newBuilder().setMessageType("MessageType").setProtocol("fix")
+                        .putProperties("name", "value")
+                )
+                .putFields("field", "simple value".toValue())
+                .putFields("complex", Message.newBuilder().putFields("field", 1.toValue()).toValue())
+                .putFields(
+                    "collection",
+                    ListValue.newBuilder()
+                        .add(1.toValue())
+                        .add(2.toValue())
+                        .add(3.toValue())
+                        .add(4.toValue()).build()
+                        .toValue()
+                )
+                .putFields(
+                    "complexCollection",
+                    ListValue.newBuilder()
+                        .add(Message.newBuilder().putFields("field", "a".toValue()).toValue())
+                        .add(Message.newBuilder().putFields("field", "b".toValue()).toValue()).toValue()
+                )
+                .putFields(
+                    "anotherCollection",
+                    ListValue.newBuilder()
+                        .add(Message.newBuilder().putFields("a", "b".toValue()).toValue())
+                        .add(Message.newBuilder().putFields("a", "c".toValue()).toValue()).build()
+                        .toValue()
+                )
+                .putFields(
+                    "anotherAnotherCollection",
+                    ListValue.newBuilder()
+                        .add("a".toValue())
+                        .add("c".toValue()).build()
+                        .toValue()
+                )
+                .build()
 
         expect {
             that(message).isEqualTo(expectedMessage)
