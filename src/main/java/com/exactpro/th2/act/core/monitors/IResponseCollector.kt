@@ -23,6 +23,7 @@ import kotlin.concurrent.write
 
 interface IResponseCollector : IMessageResponseMonitor {
     val responses: List<MessageMatches>
+    fun responseMatch(message: MessageMatches)
 }
 
 abstract class AbstractResponseCollector : IResponseCollector {

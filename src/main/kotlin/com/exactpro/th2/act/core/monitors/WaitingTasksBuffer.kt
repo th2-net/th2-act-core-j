@@ -27,7 +27,7 @@ private val LOGGER = KotlinLogging.logger {}
 
 class WaitingTasksBuffer(
     private val receiveRule: ReceiveRule,
-    private val monitor: IMessageResponseMonitor
+    private val monitor: IResponseCollector
 ) {
 
     fun matchMessage(message: Message): Boolean {
