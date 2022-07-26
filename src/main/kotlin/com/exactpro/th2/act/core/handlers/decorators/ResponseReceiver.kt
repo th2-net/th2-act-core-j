@@ -16,42 +16,36 @@
 
 package com.exactpro.th2.act.core.handlers.decorators
 
-import com.exactpro.th2.act.core.action.FailedResponseFoundException
 import com.exactpro.th2.act.core.monitors.IResponseCollector
 import com.exactpro.th2.act.core.monitors.WaitingTasksBuffer
 import com.exactpro.th2.act.core.receivers.MessagesReceiver
 import com.exactpro.th2.act.core.requests.RequestContext
-import com.exactpro.th2.act.core.response.IResponseProcessor
+import com.exactpro.th2.act.core.response.NoResponseBodyFactory
+import com.exactpro.th2.act.core.response.ResponseProcessor
 import com.exactpro.th2.act.core.rules.ReceiveRule
 
-class ResponseReceiver(private val messagesReceiver: MessagesReceiver) {
+class ResponseReceiver(private val messagesReceiver: MessagesReceiver): AutoCloseable {
 
     fun handle(
         requestContext: RequestContext,
-        responseProcessor: IResponseProcessor,
+        noResponseBodyFactory: NoResponseBodyFactory,
         timeout: Long,
         receiveRule: ReceiveRule,
         collector: IResponseCollector,
     ) {
-        val task = WaitingTasksBuffer(receiveRule, timeout, collector)
+        val task = WaitingTasksBuffer(receiveRule, collector)
         messagesReceiver.submitTask(task)
-        task.await()
+        task.await(timeout)
 
-        if(task.foundFailOn){
-            requestContext.eventBatchRouter.createErrorEvent("Found a message for failOn.", requestContext.parentEventID)
-            throw FailedResponseFoundException("Found a message for failOn.")
-        }
-
-        responseProcessor.process(
-            collector.responses, receiveRule.processedIDs() /*every message touched by the rule will be there*/, requestContext
-        )
+        val responseProcessor = ResponseProcessor(noResponseBodyFactory)
+        responseProcessor.process(collector.responses, receiveRule.processedIDs(), requestContext)
     }
 
     fun cleanMessageBuffer(){
         messagesReceiver.cleanMessageBuffer()
     }
 
-    fun close(){
+    override fun close(){
         messagesReceiver.close()
     }
 }

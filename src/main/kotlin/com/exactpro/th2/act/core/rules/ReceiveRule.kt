@@ -16,19 +16,28 @@
 
 package com.exactpro.th2.act.core.rules
 
+import com.exactpro.th2.act.core.rules.filter.FilterReceiveBuilder
+import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.grpc.Message
 
 class ReceiveRule(
-    private val filterReceive: ReceiveBuilder.() -> ReceiveBuilder,
+    private val filterReceive: AbstractReceiveBuilder.() -> AbstractReceiveBuilder,
     private val filter: (Message) -> Boolean
 ): AbstractRule() {
-    private var statusReceiveBuilder: StatusReceiveBuilder = StatusReceiveBuilder.PASSED
+    private var status: StatusReceiveBuilder = StatusReceiveBuilder.PASSED
+
+    fun statusReceiveBuilder(): StatusReceiveBuilder = status
 
     override fun checkMessageFromConnection(message: Message): Boolean {
-        statusReceiveBuilder =  ReceiveBuilder(message).let(filterReceive).getStatus()
-        return filter.invoke(message) && statusReceiveBuilder.value
+        if (filter.invoke(message)){
+            status = FilterReceiveBuilder(message).invoke(filterReceive).statusReceiveBuilder
+            if(status.eventStatus == Event.Status.PASSED) {
+                return true
+            }
+        }
+        return false
     }
 
-    val statusReceive: Boolean
-        get() = statusReceiveBuilder == StatusReceiveBuilder.FAILED
+    val foundFailOn: Boolean
+        get() = status == StatusReceiveBuilder.FAILED
 }

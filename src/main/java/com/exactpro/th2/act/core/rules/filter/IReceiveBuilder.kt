@@ -14,17 +14,14 @@
  * limitations under the License.
  */
 
-package com.exactpro.th2.act.core.monitors;
+package com.exactpro.th2.act.core.rules.filter
 
-public interface IMessageResponseMonitor {
+import com.exactpro.th2.common.grpc.Message
 
-    /**
-     * Notifies this {@link IMessageResponseMonitor} that a response has been received.
-     */
-    void responseReceived();
+interface IReceiveBuilder {
 
-    /**
-     * @return `true` if this {@link IMessageResponseMonitor} has been notified that a response was received.
-     */
-    boolean isNotified();
+    fun passOn(msgType: String, filter: Message.() -> Boolean): IReceiveBuilder
+
+    fun failOn(msgType: String, filter: Message.() -> Boolean): IReceiveBuilder
+
 }

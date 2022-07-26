@@ -43,22 +43,20 @@ class ActionBuilder<T>(
         val receiverFactory =
             MessageReceiverFactory(requestContext.subscriptionManager, preFilter, messageBufferSize)
 
-        val responseReceiver = ResponseReceiver(receiverFactory.create())
-
-        try {
-            action.invoke(Action(observer, requestContext, responseReceiver))
-            observer.onCompleted()
-        } catch (ex: NoResponseFoundException) {
-            LOGGER.error("Action did not finish correctly - ${ex.message}")
-            observer.onError(ex)
-        } catch (ex: FailedResponseFoundException) {
-            LOGGER.error("Action did not finish correctly - ${ex.message}")
-            observer.onError(ex)
-        } catch (ex: Exception) {
-            LOGGER.error("Unexpected exception during action execution - ${ex.message}")
-            observer.onError(ex)
-        } finally {
-            responseReceiver.close()
+        ResponseReceiver(receiverFactory.create()).use {
+            try {
+                action.invoke(Action(observer, requestContext, it))
+                observer.onCompleted()
+            } catch (ex: NoResponseFoundException) {
+                LOGGER.error("Action did not finish correctly - ${ex.message}")
+                observer.onError(ex)
+            } catch (ex: FailedResponseFoundException) {
+                LOGGER.error("Action did not finish correctly - ${ex.message}")
+                observer.onError(ex)
+            } catch (ex: Exception) {
+                LOGGER.error("Unexpected exception during action execution - ${ex.message}")
+                observer.onError(ex)
+            }
         }
     }
 }

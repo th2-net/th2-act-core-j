@@ -16,16 +16,14 @@
 
 package com.exactpro.th2.act.core.action
 
-import com.exactpro.th2.act.core.rules.ReceiveBuilder
+import com.exactpro.th2.act.core.rules.filter.MessageTypeCollector
 import com.exactpro.th2.act.core.handlers.decorators.ResponseReceiver
 import com.exactpro.th2.act.core.handlers.RequestMessageSubmitter
-import com.exactpro.th2.act.core.messages.MessageMapping
-import com.exactpro.th2.act.core.messages.StatusMapping
 import com.exactpro.th2.act.core.monitors.CountResponseCollector
 import com.exactpro.th2.act.core.requests.Request
 import com.exactpro.th2.act.core.requests.RequestContext
 import com.exactpro.th2.act.core.response.NoResponseBodyFactory
-import com.exactpro.th2.act.core.response.ResponseProcessor
+import com.exactpro.th2.act.core.rules.AbstractReceiveBuilder
 import com.exactpro.th2.act.core.rules.ReceiveRule
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.Message
@@ -43,8 +41,10 @@ class Action<T>(
     private val requestContext: RequestContext,
     private val responseReceiver: ResponseReceiver
 ) {
+    data class SessionKey(val sessionAlias: String, val direction: Direction)
+
     private val requestMessageSubmitter = RequestMessageSubmitter()
-    private val seqNumPreviousMessage: MutableMap<Map<String, Direction>, Long> = mutableMapOf()
+    private val sequencePreviousMessage = mutableMapOf<SessionKey, Long>()
 
     fun send(
         message: Message,
@@ -57,7 +57,7 @@ class Action<T>(
 
         if (cleanBuffer) {
             responseReceiver.cleanMessageBuffer()
-            seqNumPreviousMessage.clear()
+            sequencePreviousMessage.clear()
         }
 
         val request = Request(message)
@@ -74,16 +74,9 @@ class Action<T>(
         timeout: Long,
         sessionAlias: String,
         direction: Direction = Direction.SECOND,
-        filter: ReceiveBuilder.() -> ReceiveBuilder
+        filter: AbstractReceiveBuilder.() -> AbstractReceiveBuilder
     ): Message {
         checkingContext()
-
-        val messageTypes = ReceiveBuilder(Message.getDefaultInstance()).invoke(filter).messageTypes()
-
-        val responseProcessor = ResponseProcessor(
-            listOf(MessageMapping(messageTypes, false, StatusMapping.PASSED)),
-            NoResponseBodyFactory(messageTypes[0])
-        )
 
         val remainingTime = requestContext.remainingTime
         val deadline: Long =
@@ -93,20 +86,21 @@ class Action<T>(
                 remainingTime
             }
 
-        if (seqNumPreviousMessage[mapOf(sessionAlias to direction)] == null)
-            seqNumPreviousMessage[mapOf(sessionAlias to direction)] = Long.MIN_VALUE
+        val sessionKey = SessionKey(sessionAlias, direction)
+
+        val sequencePrevious = sequencePreviousMessage[sessionKey] ?: Long.MIN_VALUE
 
         val receiveRule = ReceiveRule(filter) {
                 msg: Message -> msg.sessionAlias == sessionAlias
                 && msg.direction == direction
-                && msg.sequence > seqNumPreviousMessage[mapOf(sessionAlias to direction)]!!
+                && msg.sequence > sequencePrevious
         }
-
+        val noResponseBodyFactory = NoResponseBodyFactory(MessageTypeCollector().invoke(filter).messageTypes)
         val collector = CountResponseCollector.singleResponse()
-        responseReceiver.handle(requestContext, responseProcessor, deadline, receiveRule, collector)
+        responseReceiver.handle(requestContext, noResponseBodyFactory, deadline, receiveRule, collector)
 
-        val responseMessage = collector.responses.single() // TODO: check that we really have only one message in responses
-        seqNumPreviousMessage[mapOf(sessionAlias to direction)] = responseMessage.sequence
+        val responseMessage = collector.responses.single().message // TODO: check that we really have only one message in responses
+        sequencePreviousMessage[sessionKey] = responseMessage.sequence
         return responseMessage
     }
 

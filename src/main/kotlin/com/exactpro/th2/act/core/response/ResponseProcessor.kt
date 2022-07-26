@@ -16,23 +16,23 @@
 
 package com.exactpro.th2.act.core.response
 
+import com.exactpro.th2.act.core.action.FailedResponseFoundException
+import com.exactpro.th2.act.core.messages.MessageMatches
 import com.exactpro.th2.act.core.action.NoResponseFoundException
-import com.exactpro.th2.act.core.messages.MessageMapping
 import com.exactpro.th2.act.core.requests.RequestContext
-import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.grpc.MessageID
+import java.util.stream.Collectors
 
 class ResponseProcessor(
-    private val expectedMessages: Collection<MessageMapping>,
-    private val noResponseBodyFactory: IBodyDataFactory
-): IResponseProcessor {
+    private val noResponseBodyFactory: IBodyDataFactory,
+): IResponseProcessor{
 
     override fun process(
-        responseMessages: List<Message>,
+        messageMatches: List<MessageMatches>,
         processedMessageIDs: Collection<MessageID>,
         requestContext: RequestContext
     ) {
-        if (responseMessages.isEmpty()) {
+        if (messageMatches.isEmpty()) {
             requestContext.eventBatchRouter.createNoResponseEvent(
                 noResponseBodyFactory = noResponseBodyFactory,
                 processedMessageIDs = processedMessageIDs,
@@ -40,21 +40,27 @@ class ResponseProcessor(
             )
             throw NoResponseFoundException("Unexpected behavior. The message to receive was not found.")
         } else {
-            val responseMessageTypes = responseMessages.map { it.metadata.messageType }
-            val matchingMapping = expectedMessages.find { it.matches(responseMessageTypes) }
-
-            if (matchingMapping == null) {
-                requestContext.eventBatchRouter.createNoMappingEvent(
-                    expectedMappings = expectedMessages,
-                    receivedMessages = responseMessages,
+            if (messageMatches.find { it.isMatchesFail() } != null) {
+                requestContext.eventBatchRouter.createErrorEvent(
+                    cause = "Found a message for failOn.",
                     parentEventID = requestContext.parentEventID
                 )
+                throw FailedResponseFoundException("Found a message for failOn.")
             } else {
-                requestContext.eventBatchRouter.createResponseReceivedEvents(
-                    messages = responseMessages,
-                    eventStatus = matchingMapping.statusMapping.eventStatus,
-                    parentEventID = requestContext.parentEventID
-                )
+                val matchingMapping = messageMatches.find { it.isMatchesPass() }
+
+                if (matchingMapping == null) {
+                    requestContext.eventBatchRouter.createNoMappingEvent(
+                        messagesMatches = messageMatches,
+                        parentEventID = requestContext.parentEventID
+                    )
+                } else {
+                    requestContext.eventBatchRouter.createResponseReceivedEvents(
+                        messages = messageMatches.stream().map { it.message }.collect(Collectors.toList()),
+                        eventStatus = matchingMapping.status.eventStatus,
+                        parentEventID = requestContext.parentEventID
+                    )
+                }
             }
         }
     }

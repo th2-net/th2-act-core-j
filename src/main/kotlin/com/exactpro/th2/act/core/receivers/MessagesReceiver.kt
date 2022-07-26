@@ -90,16 +90,9 @@ class MessagesReceiver(
     }
 
 
-    private fun checkMessage(task: WaitingTasksBuffer, message: Message): Boolean {
-        if (task.isNotified) return true
+    private fun checkMessage(task: WaitingTasksBuffer, message: Message): Boolean =
+        task.matchMessage(message) || task.isNotified
 
-        if (task.matchMessage(message) || task.foundFailOn) {
-            task.responseReceived(message)
-            return task.isNotified // found all responses
-        }
-
-        return false
-    }
 
     private fun bufferSearch(task: WaitingTasksBuffer): Boolean {
         bufferLock.read {

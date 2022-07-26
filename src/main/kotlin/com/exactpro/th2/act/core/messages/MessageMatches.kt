@@ -13,16 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.exactpro.th2.act.core.messages
 
-package com.exactpro.th2.act.core.response
+import com.exactpro.th2.act.core.rules.StatusReceiveBuilder
+import com.exactpro.th2.common.event.Event
+import com.exactpro.th2.common.grpc.Message
 
-import com.exactpro.th2.act.core.messages.IMessageType
-import com.exactpro.th2.common.event.EventUtils
-import com.exactpro.th2.common.event.IBodyData
+data class MessageMatches(val message: Message, val status: StatusReceiveBuilder) {
+    fun isMatchesPass(): Boolean =
+        status.eventStatus == Event.Status.PASSED
 
-class NoResponseBodyFactory(private val requestMessageType: List<IMessageType>): IBodyDataFactory {
-
-    override fun createBodyData(): MutableCollection<IBodyData> {
-        return mutableListOf(EventUtils.createMessageBean("No responses found for $requestMessageType"))
-    }
+    fun isMatchesFail(): Boolean =
+        status.eventStatus == Event.Status.FAILED
 }

@@ -16,7 +16,7 @@
 
 package com.exactpro.th2.act.core.routers
 
-import com.exactpro.th2.act.core.messages.MessageMapping
+import com.exactpro.th2.act.core.messages.MessageMatches
 import com.exactpro.th2.act.core.requests.IRequest
 import com.exactpro.th2.act.core.response.IBodyDataFactory
 import com.exactpro.th2.common.event.Event
@@ -187,8 +187,7 @@ class EventRouter(private val eventBatchRouter: MessageRouter<EventBatch>) {
     /**
      * Creates a no matching mapping event. The parent event can optionally be specified.
      *
-     * @param expectedMappings A [Collection] of the expected [MessageMapping]s.
-     * @param receivedMessages A [Collection] of the actually received messages.
+     * @param messagesMatches A [Collection] of the actually received messages.
      * @param parentEventID The ID of the parent event as an [EventID]
      *
      * @return The Id of the created event as an [EventID].
@@ -196,13 +195,12 @@ class EventRouter(private val eventBatchRouter: MessageRouter<EventBatch>) {
      * @throws EventSubmissionException If an error occurs while creating the specified event.
      */
     fun createNoMappingEvent(
-        expectedMappings: Collection<MessageMapping>,
-        receivedMessages: Collection<Message>,
+        messagesMatches: Collection<MessageMatches>,
         parentEventID: EventID? = null
     ): EventID {
-        val receivedMessageTypes = receivedMessages.map { it.metadata.messageType }
-        val eventBodyData = expectedMappings.map {
-            createMessageBean("${it.statusMapping.eventStatus} on messages: ${it.messageTypes}")
+        val receivedMessageTypes = messagesMatches.map { it.message.messageType }
+        val eventBodyData = messagesMatches.map {
+            createMessageBean("${it.status.eventStatus} on messages: ${it.message.messageType}")
         }
 
         return createEvent(Event.Status.FAILED,
@@ -211,7 +209,7 @@ class EventRouter(private val eventBatchRouter: MessageRouter<EventBatch>) {
                            description = "No matching message mapping found for the messages $receivedMessageTypes.",
                            body = eventBodyData,
                            parentEventID = parentEventID,
-                           linkedMessages = receivedMessages.map { it.metadata.id })
+                           linkedMessages = messagesMatches.map { it.message.metadata.id })
     }
 
     /**

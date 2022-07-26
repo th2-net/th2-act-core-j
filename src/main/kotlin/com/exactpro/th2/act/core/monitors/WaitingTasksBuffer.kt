@@ -16,6 +16,7 @@
 
 package com.exactpro.th2.act.core.monitors
 
+import com.exactpro.th2.act.core.messages.MessageMatches
 import com.exactpro.th2.act.core.rules.ReceiveRule
 import com.exactpro.th2.common.grpc.Message
 import mu.KotlinLogging
@@ -26,20 +27,17 @@ private val LOGGER = KotlinLogging.logger {}
 
 class WaitingTasksBuffer(
     private val receiveRule: ReceiveRule,
-    private val timeout: Long,
-    private val monitor: IResponseMonitor
+    private val monitor: IMessageResponseMonitor
 ) {
-    val foundFailOn: Boolean
-        get() = receiveRule.statusReceive
 
-    fun matchMessage(message: Message): Boolean =
-        receiveRule.onMessage(message)
-
-    fun responseReceived(message: Message) {
-        monitor.responseMatch(message)
+    fun matchMessage(message: Message): Boolean {
+        return if(receiveRule.onMessage(message) || receiveRule.foundFailOn) {
+            monitor.responseMatch(MessageMatches(message, receiveRule.statusReceiveBuilder()))
+            true
+        } else false
     }
 
-    fun await() {
+    fun await(timeout: Long) {
         LOGGER.info("Synchronization timeout: $timeout ms")
         val elapsed = measureTimeMillis { monitor.await(timeout, TimeUnit.MILLISECONDS) }
         LOGGER.info { "Waited for $elapsed millis" }

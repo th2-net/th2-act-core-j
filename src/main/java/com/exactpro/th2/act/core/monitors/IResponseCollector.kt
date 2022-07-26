@@ -16,22 +16,22 @@
 
 package com.exactpro.th2.act.core.monitors
 
-import com.exactpro.th2.common.grpc.Message
+import com.exactpro.th2.act.core.messages.MessageMatches
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
 import kotlin.concurrent.write
 
-interface IResponseCollector : IResponseMonitor {
-    val responses: List<Message>
+interface IResponseCollector : IMessageResponseMonitor {
+    val responses: List<MessageMatches>
 }
 
 abstract class AbstractResponseCollector : IResponseCollector {
     private val lock = ReentrantReadWriteLock()
-    private val _responses: MutableList<Message> = arrayListOf()
-    override val responses: List<Message>
+    private val _responses: MutableList<MessageMatches> = arrayListOf()
+    override val responses: List<MessageMatches>
         get() = lock.read { _responses.toList() }
 
-    protected fun addResponse(message: Message): Unit = lock.write {
+    protected fun addResponse(message: MessageMatches): Unit = lock.write {
         if (isNotified) return@write // already notified, cannot add response
         _responses += message
     }

@@ -13,16 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-package com.exactpro.th2.act.core.response
+package com.exactpro.th2.act.core.rules.filter
 
 import com.exactpro.th2.act.core.messages.IMessageType
-import com.exactpro.th2.common.event.EventUtils
-import com.exactpro.th2.common.event.IBodyData
+import com.exactpro.th2.act.core.rules.AbstractReceiveBuilder
+import com.exactpro.th2.common.grpc.Message
 
-class NoResponseBodyFactory(private val requestMessageType: List<IMessageType>): IBodyDataFactory {
+class MessageTypeCollector: AbstractReceiveBuilder() {
 
-    override fun createBodyData(): MutableCollection<IBodyData> {
-        return mutableListOf(EventUtils.createMessageBean("No responses found for $requestMessageType"))
+    override fun passOn(msgType: String, filter: Message.() -> Boolean): MessageTypeCollector {
+        msgTypes.add(IMessageType { msgType })
+        return this@MessageTypeCollector
     }
+
+    override fun failOn(msgType: String, filter: Message.() -> Boolean): MessageTypeCollector {
+        msgTypes.add(IMessageType { msgType })
+        return this@MessageTypeCollector
+    }
+
 }

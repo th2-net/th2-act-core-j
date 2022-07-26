@@ -16,7 +16,7 @@
 
 package com.exactpro.th2.act.core.monitors
 
-import com.exactpro.th2.common.grpc.Message
+import com.exactpro.th2.act.core.messages.MessageMatches
 import mu.KotlinLogging
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -27,27 +27,29 @@ class CountResponseCollector private constructor(count: Int) : AbstractResponseC
     }
     private val latch = CountDownLatch(count)
 
-    override fun responseMatch(message: Message) {
+    override fun responseMatch(message: MessageMatches) {
         addResponse(message)
         latch.countDown()
     }
 
-    override fun await(time: Long, unit: TimeUnit) {
+    override fun await(timeout: Long, timeUnit: TimeUnit) {
         if (this.isNotified) {
             LOGGER.info("Monitor has been notified before it has started to await a response.")
             return
         }
 
-        if (!latch.await(time, unit)) {
+        if (!latch.await(timeout, timeUnit)) {
             LOGGER.info(
                 "Timeout elapsed before monitor was notified. Timeout {} ms",
-                TimeUnit.MILLISECONDS.convert(time, unit)
+                TimeUnit.MILLISECONDS.convert(timeout, timeUnit)
             )
         }
     }
 
     override val isNotified: Boolean
         get() = latch.count <= 0
+
+    override fun responseReceived(): Unit = latch.countDown()
 
     companion object {
         private val LOGGER = KotlinLogging.logger { }

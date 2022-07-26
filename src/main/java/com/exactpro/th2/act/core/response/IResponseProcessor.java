@@ -16,8 +16,8 @@
 
 package com.exactpro.th2.act.core.response;
 
+import com.exactpro.th2.act.core.messages.MessageMatches;
 import com.exactpro.th2.act.core.requests.RequestContext;
-import com.exactpro.th2.common.grpc.Message;
 import com.exactpro.th2.common.grpc.MessageID;
 
 import java.util.Collection;
@@ -27,12 +27,12 @@ public interface IResponseProcessor {
     /**
      * Processes the messages sent by the system in response to a submitted message.
      *
-     * @param responseMessages    A {@link List} of received messages as {@link Message} objects.
+     * @param messageMatches    A {@link List} of received messages as {@link MessageMatches} objects.
      * @param processedMessageIDs A {@link Collection} of {@link MessageID}s of all messages processed while
      *                            anticipating the system's response.
      * @param requestContext      The {@link RequestContext} of the request for which these messages are being processed.
      */
-    void process(List<Message> responseMessages,
+    void process(List<MessageMatches> messageMatches,
                  Collection<MessageID> processedMessageIDs,
                  RequestContext requestContext);
 }

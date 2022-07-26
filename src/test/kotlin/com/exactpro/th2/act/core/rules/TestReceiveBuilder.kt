@@ -16,6 +16,7 @@
 
 package com.exactpro.th2.act.core.rules
 
+import com.exactpro.th2.act.core.rules.filter.FilterReceiveBuilder
 import com.exactpro.th2.common.grpc.*
 import com.exactpro.th2.common.message.sequence
 import com.exactpro.th2.common.message.sessionAlias
@@ -26,7 +27,7 @@ class TestReceiveBuilder {
 
     @Test
     fun `test for passOn`() {
-        val receiveBuilder = ReceiveBuilder(
+        val receiveBuilder = FilterReceiveBuilder(
             Message.newBuilder().setMetadata(
                 MessageMetadata.newBuilder()
                     .setMessageType("NewOrderSingle")
@@ -40,19 +41,19 @@ class TestReceiveBuilder {
         Assertions.assertEquals(
             StatusReceiveBuilder.PASSED,
             receiveBuilder.passOn("NewOrderSingle") { this.sequence == 1L && this.sessionAlias == "sessionAlias" }
-                .getStatus()
+                .statusReceiveBuilder
         )
 
         Assertions.assertEquals(
             StatusReceiveBuilder.OTHER,
             receiveBuilder.passOn("NewOrderSingle") { this.sequence == 2L && this.sessionAlias == "anotherSessionAlias" }
-                .getStatus()
+                .statusReceiveBuilder
         )
     }
 
     @Test
     fun `test for failOn`() {
-        val receiveBuilder = ReceiveBuilder(
+        val receiveBuilder = FilterReceiveBuilder(
             Message.newBuilder().setMetadata(
                 MessageMetadata.newBuilder()
                     .setMessageType("NewOrderSingle")
@@ -66,7 +67,7 @@ class TestReceiveBuilder {
         Assertions.assertEquals(
             StatusReceiveBuilder.FAILED,
             receiveBuilder.failOn("NewOrderSingle") { this.sequence == 1L && this.sessionAlias == "sessionAlias" }
-                .getStatus()
+                .statusReceiveBuilder
         )
     }
 }

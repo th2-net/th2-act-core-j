@@ -17,10 +17,11 @@
 package com.exactpro.th2.act.core.routers
 
 import com.exactpro.th2.act.*
-import com.exactpro.th2.act.core.messages.passedOn
+import com.exactpro.th2.act.core.messages.MessageMatches
 import com.exactpro.th2.act.core.requests.Request
 import com.exactpro.th2.act.core.response.IBodyDataFactory
 import com.exactpro.th2.act.core.response.NoResponseBodyFactory
+import com.exactpro.th2.act.core.rules.StatusReceiveBuilder
 import com.exactpro.th2.act.stubs.StubMessageRouter
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.grpc.EventBatch
@@ -179,7 +180,7 @@ internal class TestEventRouter {
         val parentEventID = randomString().toEventID()
 
         val eventID = eventRouter.createNoResponseEvent(
-            noResponseBodyFactory = NoResponseBodyFactory(randomMessageType()),
+            noResponseBodyFactory = NoResponseBodyFactory(listOf(randomMessageType())),
             processedMessageIDs = messageIDs,
             parentEventID = parentEventID
         )
@@ -198,16 +199,14 @@ internal class TestEventRouter {
 
     @Test
     fun `test should create a no mapping event`() {
-        val expectedMappings = listOf(
-            passedOn(TestMessageType.REJECT), passedOn(TestMessageType.NEW_ORDER_SINGLE, TestMessageType.REJECT)
-        )
-
         val messages = 5.randomMessageTypes(TestMessageType.REJECT).map { it.toRandomMessage() }
         val parentEventID = randomString().toEventID()
 
+        val messagesMatches = mutableListOf<MessageMatches>()
+        messages.forEach { messagesMatches.add(MessageMatches(it, StatusReceiveBuilder.PASSED)) }
+
         val eventID = eventRouter.createNoMappingEvent(
-            expectedMappings = expectedMappings,
-            receivedMessages = messages,
+            messagesMatches = messagesMatches,
             parentEventID = parentEventID
         )
 
@@ -282,8 +281,7 @@ internal class TestEventRouter {
                 }),
                 Arguments.of(Consumer { eventRouter: EventRouter ->
                     eventRouter.createNoMappingEvent(
-                        expectedMappings = 5.of { passedOn(*5.randomMessageTypes()) }.toList(),
-                        receivedMessages = 5.of { randomMessage() }.toList(),
+                        messagesMatches = 5.of { MessageMatches(randomMessage(), StatusReceiveBuilder.PASSED) }.toList(),
                         parentEventID = randomString().toEventID()
                     )
                 }),
