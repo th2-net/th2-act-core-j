@@ -40,19 +40,20 @@ class ResponseProcessor(
             )
             throw NoResponseFoundException("Unexpected behavior. The message to receive was not found.")
         } else {
-            val messageMatches = messagesMatches.single() // only one message corresponding to fail or pass is returned
-            if (messageMatches.isMatchesFail()) {
-                requestContext.eventBatchRouter.createErrorEvent(
-                    cause = "Found a message for failOn.",
-                    parentEventID = requestContext.parentEventID
-                )
-                throw FailedResponseFoundException("Found a message for failOn.")
-            } else {
-                requestContext.eventBatchRouter.createResponseReceivedEvents(
-                    messages = messagesMatches.stream().map { it.message }.collect(Collectors.toList()),
-                    eventStatus = messageMatches.status,
-                    parentEventID = requestContext.parentEventID
-                )
+            messagesMatches.forEach {
+                if (it.isMatchesFail()) {
+                    requestContext.eventBatchRouter.createErrorEvent(
+                        cause = "Found a message for failOn.",
+                        parentEventID = requestContext.parentEventID
+                    )
+                    throw FailedResponseFoundException("Found a message for failOn.")
+                } else {
+                    requestContext.eventBatchRouter.createResponseReceivedEvents(
+                        messages = messagesMatches.stream().map { msgMatches -> msgMatches.message }.collect(Collectors.toList()),
+                        eventStatus = it.status,
+                        parentEventID = requestContext.parentEventID
+                    )
+                }
             }
         }
     }
