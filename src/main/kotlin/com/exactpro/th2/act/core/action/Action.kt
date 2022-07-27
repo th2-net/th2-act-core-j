@@ -96,7 +96,7 @@ class Action<T>(
                 && msg.direction == direction
                 && msg.sequence > sequencePrevious
         }
-        val responseProcessor = ResponseProcessor(NoResponseBodyFactory(MessageTypeCollector().invoke(filter)))
+        val responseProcessor = ResponseProcessor(NoResponseBodyFactory(MessageTypeCollector().apply(filter).messageTypes ))
         val collector = CountResponseCollector.singleResponse()
         responseReceiver.handle(requestContext, responseProcessor, deadline, receiveRule, collector)
 
