@@ -17,6 +17,7 @@
 package com.exactpro.th2.act.core.response
 
 import com.exactpro.th2.act.*
+import com.exactpro.th2.act.core.action.FailedResponseFoundException
 import com.exactpro.th2.act.core.messages.MessageMatches
 import com.exactpro.th2.act.core.action.NoResponseFoundException
 import com.exactpro.th2.act.core.managers.SubscriptionManager
@@ -86,7 +87,7 @@ internal class TestResponseProcessor {
 
         val messageMatches = mutableListOf(MessageMatches(processedMessages, Status.PASSED))
 
-         responseProcessor.process(
+        responseProcessor.process(
             messagesMatches = messageMatches,
             processedMessageIDs = listOf(processedMessages.metadata.id),
             requestContext = requestContext
@@ -144,37 +145,34 @@ internal class TestResponseProcessor {
         }
     }
 
- /*  @Test
-    fun `test should submit a no matching mapping event`() {
-        val processedMessages = randomMessage()
+    @Test
+       fun `test should submit a no matching mapping event`() {
+       val receivedMessages = 5 of { randomMessage() }
 
-        val messageMatches = mutableListOf(MessageMatches(processedMessages, Status.PASSED))
+       val messageMatches = mutableListOf<MessageMatches>()
+       receivedMessages.forEach { messageMatches.add(MessageMatches(it, Status.FAILED)) }
 
         val responseProcessor = ResponseProcessor(
             noResponseBodyFactory = NoResponseBodyFactory(listOf(TestMessageType.NEW_ORDER_SINGLE)),
         )
 
-        every { eventRouter.createNoMappingEvent(any(), any()) } answers { randomString().toEventID() }
+        every { eventRouter.createErrorEvent(any(), any()) } answers { randomString().toEventID() }
 
-        responseProcessor.process(
-            messagesMatches = messageMatches,
-            processedMessageIDs = listOf(processedMessages.metadata.id),
-            requestContext = requestContext
-        )
-
-        val receivedMessagesSlot = slot<List<MessageMatches>>()
-
-        verify {
-            eventRouter.createNoMappingEvent(
-                messagesMatches = capture(receivedMessagesSlot),
-                parentEventID = requestContext.parentEventID
+        assertThrows(FailedResponseFoundException::class.java) {
+            responseProcessor.process(
+                messagesMatches = messageMatches,
+                processedMessageIDs = receivedMessages.map { it.metadata.id },
+                requestContext = requestContext
             )
         }
 
-        expect { // NOTE: Stirkt bug with comparing elements from arrays to elements from a list.
-            that(receivedMessagesSlot.captured).containsExactlyInAnyOrder(messageMatches)
+        verify {
+            eventRouter.createErrorEvent(
+                cause = "Found a message for failOn.",
+                parentEventID = requestContext.parentEventID
+            )
         }
-    }*/
+    }
 
     @Test
     fun `test should not send response to client`() {

@@ -31,11 +31,10 @@ class ReceiveRule(
 
     override fun checkMessageFromConnection(message: Message): Boolean {
         if (filter.invoke(message)){
-            return try {
-                status = FilterReceiveBuilder(message).invoke(filterReceive)
-                true
-            } catch (ex: UninitializedPropertyAccessException){
-                false
+            val filter = FilterReceiveBuilder(message).apply(filterReceive)
+            if (filter.isFilter) {
+                status = filter.status
+                return true
             }
         }
         return false

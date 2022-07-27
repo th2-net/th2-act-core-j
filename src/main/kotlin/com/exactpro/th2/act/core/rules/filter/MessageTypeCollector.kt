@@ -19,7 +19,10 @@ import com.exactpro.th2.act.core.messages.IMessageType
 import com.exactpro.th2.common.grpc.Message
 
 class MessageTypeCollector: IReceiveBuilder {
-    private val messageTypes = mutableListOf<IMessageType>()
+    private val msgTypes = mutableSetOf<IMessageType>()
+
+    val messageTypes: List<IMessageType>
+        get() = msgTypes.toList()
 
     override fun passOn(msgType: String, filter: Message.() -> Boolean): MessageTypeCollector =
         addMessageType(msgType)
@@ -28,12 +31,7 @@ class MessageTypeCollector: IReceiveBuilder {
         addMessageType(msgType)
 
     private fun addMessageType(msgType: String): MessageTypeCollector {
-        messageTypes.add(IMessageType { msgType })
+        msgTypes.add(IMessageType { msgType })
         return this@MessageTypeCollector
-    }
-
-    operator fun invoke(filter: IReceiveBuilder.() -> Unit): List<IMessageType> {
-        filter()
-        return messageTypes.toList()
     }
 }

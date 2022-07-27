@@ -20,21 +20,32 @@ import com.exactpro.th2.common.event.Event.Status
 import com.exactpro.th2.common.grpc.Message
 
 class FilterReceiveBuilder(private val message: Message): IReceiveBuilder {
-    private lateinit var status: Status
+    private var statusReceiveBuilder: Status = Status.PASSED
+    private var isFilterReceiveBuilder: Boolean = false
 
-    override fun passOn(msgType: String, filter: Message.() -> Boolean): FilterReceiveBuilder =
-        Status.PASSED.on(msgType, filter)
+    val status: Status
+        get() = statusReceiveBuilder
 
-    override fun failOn(msgType: String, filter: Message.() -> Boolean): FilterReceiveBuilder =
-        Status.FAILED.on(msgType, filter)
+    val isFilter: Boolean
+        get() = isFilterReceiveBuilder
 
-    private fun Status.on(msgType: String, filter: Message.() -> Boolean): FilterReceiveBuilder {
-        if (message.metadata.messageType == msgType && filter.invoke(message)) status = this
+
+    override fun passOn(msgType: String, filter: Message.() -> Boolean): FilterReceiveBuilder {
+        if (!Status.PASSED.on(msgType, filter)) isFilterReceiveBuilder = false
         return this@FilterReceiveBuilder
     }
 
-    operator fun invoke(filter: IReceiveBuilder.() -> Unit): Status {
-        filter()
-        return status
+    override fun failOn(msgType: String, filter: Message.() -> Boolean): FilterReceiveBuilder {
+        Status.FAILED.on(msgType, filter)
+        return this@FilterReceiveBuilder
     }
+
+    private fun Status.on(msgType: String, filter: Message.() -> Boolean): Boolean {
+        if (message.metadata.messageType == msgType && filter.invoke(message)) {
+            statusReceiveBuilder = this
+            isFilterReceiveBuilder = true
+        }
+        return isFilterReceiveBuilder
+    }
+
 }

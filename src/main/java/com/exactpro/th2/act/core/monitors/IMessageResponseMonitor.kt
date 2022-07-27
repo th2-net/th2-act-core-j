@@ -16,12 +16,15 @@
 
 package com.exactpro.th2.act.core.monitors
 
+import com.exactpro.th2.act.core.messages.MessageMatches
 import java.util.concurrent.TimeUnit
 
 /**
  * Monitor for waiting until all expected responses are found
  */
 interface IMessageResponseMonitor {
+
+    fun responseMatch(message: MessageMatches)
 
     /**
      * Blocks the current thread until this [IMessageResponseMonitor] is notified, or the specified timeout is elapsed.

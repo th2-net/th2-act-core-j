@@ -15,6 +15,7 @@
  */
 package com.exactpro.th2.act.core.monitors
 
+import com.exactpro.th2.act.core.messages.MessageMatches
 import mu.KotlinLogging
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -24,6 +25,10 @@ private val LOGGER = KotlinLogging.logger {}
 class MessageResponseMonitor: IMessageResponseMonitor {
 
     private val latch = CountDownLatch(1)
+
+    override fun responseMatch(message: MessageMatches) {
+        TODO("Not yet implemented")
+    }
 
     override fun await(timeout: Long, timeUnit: TimeUnit) {
 
