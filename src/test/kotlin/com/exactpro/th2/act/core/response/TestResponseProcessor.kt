@@ -22,7 +22,7 @@ import com.exactpro.th2.act.core.action.NoResponseFoundException
 import com.exactpro.th2.act.core.managers.SubscriptionManager
 import com.exactpro.th2.act.core.requests.RequestContext
 import com.exactpro.th2.act.core.routers.EventRouter
-import com.exactpro.th2.act.core.rules.StatusReceiveBuilder
+import com.exactpro.th2.common.event.Event.Status
 import com.exactpro.th2.common.grpc.*
 import io.mockk.*
 import org.junit.jupiter.api.Assertions.assertThrows
@@ -84,10 +84,10 @@ internal class TestResponseProcessor {
         val processedMessages = randomMessage()
         every { eventRouter.createResponseReceivedEvents(any(), any(), any()) } answers { randomString().toEventID() }
 
-        val messageMatches = mutableListOf(MessageMatches(processedMessages, StatusReceiveBuilder.PASSED))
+        val messageMatches = mutableListOf(MessageMatches(processedMessages, Status.PASSED))
 
          responseProcessor.process(
-            messageMatches = messageMatches,
+            messagesMatches = messageMatches,
             processedMessageIDs = listOf(processedMessages.metadata.id),
             requestContext = requestContext
         )
@@ -97,7 +97,7 @@ internal class TestResponseProcessor {
         verify {
             eventRouter.createResponseReceivedEvents(
                 messages = capture(responseMessagesSlot),
-                eventStatus = com.exactpro.th2.common.event.Event.Status.PASSED,
+                eventStatus = Status.PASSED,
                 parentEventID = requestContext.parentEventID
             )
         }
@@ -121,7 +121,7 @@ internal class TestResponseProcessor {
 
         assertThrows(NoResponseFoundException::class.java) {
             responseProcessor.process(
-                messageMatches = emptyList(),
+                messagesMatches = emptyList(),
                 processedMessageIDs = processedMessages.map { it.metadata.id },
                 requestContext = requestContext
             )
@@ -144,39 +144,35 @@ internal class TestResponseProcessor {
         }
     }
 
-/*    @Test
+ /*  @Test
     fun `test should submit a no matching mapping event`() {
-        val processedMessages = 5 of { randomMessage() }
-        val receivedMessages = 5 of { randomMessage() }
+        val processedMessages = randomMessage()
 
-        val expendedStatus = mutableListOf<MessageStatus>()
-        receivedMessages.forEach { expendedStatus.add(MessageStatus(it, StatusReceiveBuilder.PASSED)) }
+        val messageMatches = mutableListOf(MessageMatches(processedMessages, Status.PASSED))
 
         val responseProcessor = ResponseProcessor(
             noResponseBodyFactory = NoResponseBodyFactory(listOf(TestMessageType.NEW_ORDER_SINGLE)),
-            expectedMessages = expendedStatus
         )
 
-        every { eventRouter.createNoMappingEvent(any(), any(), any()) } answers { randomString().toEventID() }
+        every { eventRouter.createNoMappingEvent(any(), any()) } answers { randomString().toEventID() }
 
         responseProcessor.process(
-            responseMessages = receivedMessages.toList(),
-            processedMessageIDs = processedMessages.plus(receivedMessages).map { it.metadata.id },
+            messagesMatches = messageMatches,
+            processedMessageIDs = listOf(processedMessages.metadata.id),
             requestContext = requestContext
         )
 
-        val receivedMessagesSlot = slot<List<Message>>()
+        val receivedMessagesSlot = slot<List<MessageMatches>>()
 
         verify {
             eventRouter.createNoMappingEvent(
-                expectedMappings = expendedStatus,
-                receivedMessages = capture(receivedMessagesSlot),
+                messagesMatches = capture(receivedMessagesSlot),
                 parentEventID = requestContext.parentEventID
             )
         }
 
         expect { // NOTE: Stirkt bug with comparing elements from arrays to elements from a list.
-            that(receivedMessagesSlot.captured).containsExactlyInAnyOrder(receivedMessages.toList())
+            that(receivedMessagesSlot.captured).containsExactlyInAnyOrder(messageMatches)
         }
     }*/
 
@@ -191,7 +187,7 @@ internal class TestResponseProcessor {
         every { eventRouter.createResponseReceivedEvents(any(), any(), any()) } answers { randomString().toEventID() }
 
         responseProcessor.process(
-            messageMatches = listOf(MessageMatches(randomMessage(), StatusReceiveBuilder.PASSED)),
+            messagesMatches = listOf(MessageMatches(randomMessage(), Status.PASSED)),
             processedMessageIDs = listOf(receivedMessage.metadata.id),
             requestContext = requestContext
         )

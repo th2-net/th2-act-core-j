@@ -20,15 +20,14 @@ import com.exactpro.th2.act.core.monitors.IResponseCollector
 import com.exactpro.th2.act.core.monitors.WaitingTasksBuffer
 import com.exactpro.th2.act.core.receivers.MessagesReceiver
 import com.exactpro.th2.act.core.requests.RequestContext
-import com.exactpro.th2.act.core.response.NoResponseBodyFactory
-import com.exactpro.th2.act.core.response.ResponseProcessor
+import com.exactpro.th2.act.core.response.IResponseProcessor
 import com.exactpro.th2.act.core.rules.ReceiveRule
 
 class ResponseReceiver(private val messagesReceiver: MessagesReceiver): AutoCloseable {
 
     fun handle(
         requestContext: RequestContext,
-        noResponseBodyFactory: NoResponseBodyFactory,
+        responseProcessor: IResponseProcessor,
         timeout: Long,
         receiveRule: ReceiveRule,
         collector: IResponseCollector,
@@ -37,7 +36,6 @@ class ResponseReceiver(private val messagesReceiver: MessagesReceiver): AutoClos
         messagesReceiver.submitTask(task)
         task.await(timeout)
 
-        val responseProcessor = ResponseProcessor(noResponseBodyFactory)
         responseProcessor.process(collector.responses, receiveRule.processedIDs(), requestContext)
     }
 

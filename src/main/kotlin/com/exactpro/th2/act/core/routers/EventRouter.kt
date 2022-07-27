@@ -200,7 +200,7 @@ class EventRouter(private val eventBatchRouter: MessageRouter<EventBatch>) {
     ): EventID {
         val receivedMessageTypes = messagesMatches.map { it.message.messageType }
         val eventBodyData = messagesMatches.map {
-            createMessageBean("${it.status.eventStatus} on messages: ${it.message.messageType}")
+            createMessageBean("${it.status} on messages: ${it.message.messageType}")
         }
 
         return createEvent(Event.Status.FAILED,

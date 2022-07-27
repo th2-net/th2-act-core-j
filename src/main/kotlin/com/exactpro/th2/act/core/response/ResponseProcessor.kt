@@ -28,11 +28,11 @@ class ResponseProcessor(
 ): IResponseProcessor{
 
     override fun process(
-        messageMatches: List<MessageMatches>,
+        messagesMatches: List<MessageMatches>,
         processedMessageIDs: Collection<MessageID>,
         requestContext: RequestContext
     ) {
-        if (messageMatches.isEmpty()) {
+        if (messagesMatches.isEmpty()) {
             requestContext.eventBatchRouter.createNoResponseEvent(
                 noResponseBodyFactory = noResponseBodyFactory,
                 processedMessageIDs = processedMessageIDs,
@@ -40,27 +40,19 @@ class ResponseProcessor(
             )
             throw NoResponseFoundException("Unexpected behavior. The message to receive was not found.")
         } else {
-            if (messageMatches.find { it.isMatchesFail() } != null) {
+            val messageMatches = messagesMatches.single() // only one message corresponding to fail or pass is returned
+            if (messageMatches.isMatchesFail()) {
                 requestContext.eventBatchRouter.createErrorEvent(
                     cause = "Found a message for failOn.",
                     parentEventID = requestContext.parentEventID
                 )
                 throw FailedResponseFoundException("Found a message for failOn.")
             } else {
-                val matchingMapping = messageMatches.find { it.isMatchesPass() }
-
-                if (matchingMapping == null) {
-                    requestContext.eventBatchRouter.createNoMappingEvent(
-                        messagesMatches = messageMatches,
-                        parentEventID = requestContext.parentEventID
-                    )
-                } else {
-                    requestContext.eventBatchRouter.createResponseReceivedEvents(
-                        messages = messageMatches.stream().map { it.message }.collect(Collectors.toList()),
-                        eventStatus = matchingMapping.status.eventStatus,
-                        parentEventID = requestContext.parentEventID
-                    )
-                }
+                requestContext.eventBatchRouter.createResponseReceivedEvents(
+                    messages = messagesMatches.stream().map { it.message }.collect(Collectors.toList()),
+                    eventStatus = messageMatches.status,
+                    parentEventID = requestContext.parentEventID
+                )
             }
         }
     }

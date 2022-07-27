@@ -16,21 +16,25 @@
 
 package com.exactpro.th2.act.core.rules.filter
 
-import com.exactpro.th2.act.core.rules.AbstractReceiveBuilder
-import com.exactpro.th2.act.core.rules.StatusReceiveBuilder
+import com.exactpro.th2.common.event.Event.Status
 import com.exactpro.th2.common.grpc.Message
 
-class FilterReceiveBuilder(private val message: Message): AbstractReceiveBuilder() {
+class FilterReceiveBuilder(private val message: Message): IReceiveBuilder {
+    private lateinit var status: Status
 
-    override fun passOn(msgType: String, filter: Message.() -> Boolean): FilterReceiveBuilder {
-        status = if (message.metadata.messageType == msgType && filter.invoke(message)) StatusReceiveBuilder.PASSED
-            else StatusReceiveBuilder.OTHER
+    override fun passOn(msgType: String, filter: Message.() -> Boolean): FilterReceiveBuilder =
+        Status.PASSED.on(msgType, filter)
+
+    override fun failOn(msgType: String, filter: Message.() -> Boolean): FilterReceiveBuilder =
+        Status.FAILED.on(msgType, filter)
+
+    private fun Status.on(msgType: String, filter: Message.() -> Boolean): FilterReceiveBuilder {
+        if (message.metadata.messageType == msgType && filter.invoke(message)) status = this
         return this@FilterReceiveBuilder
     }
 
-    override fun failOn(msgType: String, filter: Message.() -> Boolean): FilterReceiveBuilder {
-        if (message.metadata.messageType == msgType && filter.invoke(message)) status = StatusReceiveBuilder.FAILED
-        return this@FilterReceiveBuilder
+    operator fun invoke(filter: IReceiveBuilder.() -> Unit): Status {
+        filter()
+        return status
     }
-
 }

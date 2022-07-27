@@ -31,7 +31,7 @@ class WaitingTasksBuffer(
 ) {
 
     fun matchMessage(message: Message): Boolean {
-        return if(receiveRule.onMessage(message) || receiveRule.foundFailOn) {
+        return if(receiveRule.onMessage(message)) {
             monitor.responseMatch(MessageMatches(message, receiveRule.statusReceiveBuilder()))
             true
         } else false

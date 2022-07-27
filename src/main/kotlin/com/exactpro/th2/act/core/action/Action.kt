@@ -23,8 +23,9 @@ import com.exactpro.th2.act.core.monitors.CountResponseCollector
 import com.exactpro.th2.act.core.requests.Request
 import com.exactpro.th2.act.core.requests.RequestContext
 import com.exactpro.th2.act.core.response.NoResponseBodyFactory
-import com.exactpro.th2.act.core.rules.AbstractReceiveBuilder
+import com.exactpro.th2.act.core.response.ResponseProcessor
 import com.exactpro.th2.act.core.rules.ReceiveRule
+import com.exactpro.th2.act.core.rules.filter.IReceiveBuilder
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.message.direction
@@ -74,7 +75,7 @@ class Action<T>(
         timeout: Long,
         sessionAlias: String,
         direction: Direction = Direction.SECOND,
-        filter: AbstractReceiveBuilder.() -> AbstractReceiveBuilder
+        filter: IReceiveBuilder.() -> Unit
     ): Message {
         checkingContext()
 
@@ -95,9 +96,9 @@ class Action<T>(
                 && msg.direction == direction
                 && msg.sequence > sequencePrevious
         }
-        val noResponseBodyFactory = NoResponseBodyFactory(MessageTypeCollector().invoke(filter).messageTypes)
+        val responseProcessor = ResponseProcessor(NoResponseBodyFactory(MessageTypeCollector().invoke(filter)))
         val collector = CountResponseCollector.singleResponse()
-        responseReceiver.handle(requestContext, noResponseBodyFactory, deadline, receiveRule, collector)
+        responseReceiver.handle(requestContext, responseProcessor, deadline, receiveRule, collector)
 
         val responseMessage = collector.responses.single().message // TODO: check that we really have only one message in responses
         sequencePreviousMessage[sessionKey] = responseMessage.sequence

@@ -15,14 +15,9 @@
  */
 package com.exactpro.th2.act.core.messages
 
-import com.exactpro.th2.act.core.rules.StatusReceiveBuilder
-import com.exactpro.th2.common.event.Event
+import com.exactpro.th2.common.event.Event.Status
 import com.exactpro.th2.common.grpc.Message
 
-data class MessageMatches(val message: Message, val status: StatusReceiveBuilder) {
-    fun isMatchesPass(): Boolean =
-        status.eventStatus == Event.Status.PASSED
-
-    fun isMatchesFail(): Boolean =
-        status.eventStatus == Event.Status.FAILED
+data class MessageMatches(val message: Message, val status: Status) {
+    fun isMatchesFail(): Boolean = status == Status.FAILED
 }

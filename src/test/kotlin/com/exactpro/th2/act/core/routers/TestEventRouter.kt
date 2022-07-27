@@ -21,9 +21,8 @@ import com.exactpro.th2.act.core.messages.MessageMatches
 import com.exactpro.th2.act.core.requests.Request
 import com.exactpro.th2.act.core.response.IBodyDataFactory
 import com.exactpro.th2.act.core.response.NoResponseBodyFactory
-import com.exactpro.th2.act.core.rules.StatusReceiveBuilder
 import com.exactpro.th2.act.stubs.StubMessageRouter
-import com.exactpro.th2.common.event.Event
+import com.exactpro.th2.common.event.Event.Status
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventStatus
 import org.junit.jupiter.api.BeforeEach
@@ -101,15 +100,15 @@ internal class TestEventRouter {
     }
 
     @ParameterizedTest
-    @EnumSource(Event.Status::class)
-    fun `test should create parent event`(eventStatus: Event.Status) {
+    @EnumSource(Status::class)
+    fun `test should create parent event`(eventStatus: Status) {
         val request = Request(randomMessage(), randomString())
         val rpcName = randomString()
         val eventID = eventRouter.createParentEvent(request, rpcName, eventStatus)
 
         val expectedStatus = when (eventStatus) {
-            Event.Status.PASSED -> EventStatus.SUCCESS
-            Event.Status.FAILED -> EventStatus.FAILED
+            Status.PASSED -> EventStatus.SUCCESS
+            Status.FAILED -> EventStatus.FAILED
         }
 
         expect {
@@ -145,14 +144,14 @@ internal class TestEventRouter {
     }
 
     @ParameterizedTest
-    @EnumSource(Event.Status::class)
-    fun `test should create a message received event`(eventStatus: Event.Status) {
+    @EnumSource(Status::class)
+    fun `test should create a message received event`(eventStatus: Status) {
         val messages = 5 of { randomMessage() }
         val parentEventID = randomString().toEventID()
 
         val expectedStatus = when (eventStatus) {
-            Event.Status.PASSED -> EventStatus.SUCCESS
-            Event.Status.FAILED -> EventStatus.FAILED
+            Status.PASSED -> EventStatus.SUCCESS
+            Status.FAILED -> EventStatus.FAILED
         }
 
         eventRouter.createResponseReceivedEvents(
@@ -203,7 +202,7 @@ internal class TestEventRouter {
         val parentEventID = randomString().toEventID()
 
         val messagesMatches = mutableListOf<MessageMatches>()
-        messages.forEach { messagesMatches.add(MessageMatches(it, StatusReceiveBuilder.PASSED)) }
+        messages.forEach { messagesMatches.add(MessageMatches(it, Status.PASSED)) }
 
         val eventID = eventRouter.createNoMappingEvent(
             messagesMatches = messagesMatches,
@@ -281,14 +280,14 @@ internal class TestEventRouter {
                 }),
                 Arguments.of(Consumer { eventRouter: EventRouter ->
                     eventRouter.createNoMappingEvent(
-                        messagesMatches = 5.of { MessageMatches(randomMessage(), StatusReceiveBuilder.PASSED) }.toList(),
+                        messagesMatches = 5.of { MessageMatches(randomMessage(), Status.PASSED) }.toList(),
                         parentEventID = randomString().toEventID()
                     )
                 }),
                 Arguments.of(Consumer { eventRouter: EventRouter ->
                     eventRouter.createResponseReceivedEvents(
                         messages = 5.of { randomMessage() }.toList(),
-                        eventStatus = Event.Status.values().random(),
+                        eventStatus = Status.values().random(),
                         parentEventID = randomString().toEventID()
                     )
                 })

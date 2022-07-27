@@ -17,27 +17,27 @@
 package com.exactpro.th2.act.core.rules
 
 import com.exactpro.th2.act.core.rules.filter.FilterReceiveBuilder
-import com.exactpro.th2.common.event.Event
+import com.exactpro.th2.act.core.rules.filter.IReceiveBuilder
+import com.exactpro.th2.common.event.Event.Status
 import com.exactpro.th2.common.grpc.Message
 
 class ReceiveRule(
-    private val filterReceive: AbstractReceiveBuilder.() -> AbstractReceiveBuilder,
+    private val filterReceive: IReceiveBuilder.() -> Unit,
     private val filter: (Message) -> Boolean
 ): AbstractRule() {
-    private var status: StatusReceiveBuilder = StatusReceiveBuilder.PASSED
+    private var status: Status = Status.PASSED
 
-    fun statusReceiveBuilder(): StatusReceiveBuilder = status
+    fun statusReceiveBuilder(): Status = status
 
     override fun checkMessageFromConnection(message: Message): Boolean {
         if (filter.invoke(message)){
-            status = FilterReceiveBuilder(message).invoke(filterReceive).statusReceiveBuilder
-            if(status.eventStatus == Event.Status.PASSED) {
-                return true
+            return try {
+                status = FilterReceiveBuilder(message).invoke(filterReceive)
+                true
+            } catch (ex: UninitializedPropertyAccessException){
+                false
             }
         }
         return false
     }
-
-    val foundFailOn: Boolean
-        get() = status == StatusReceiveBuilder.FAILED
 }

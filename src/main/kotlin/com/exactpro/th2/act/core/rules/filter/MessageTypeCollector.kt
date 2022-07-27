@@ -16,19 +16,24 @@
 package com.exactpro.th2.act.core.rules.filter
 
 import com.exactpro.th2.act.core.messages.IMessageType
-import com.exactpro.th2.act.core.rules.AbstractReceiveBuilder
 import com.exactpro.th2.common.grpc.Message
 
-class MessageTypeCollector: AbstractReceiveBuilder() {
+class MessageTypeCollector: IReceiveBuilder {
+    private val messageTypes = mutableListOf<IMessageType>()
 
-    override fun passOn(msgType: String, filter: Message.() -> Boolean): MessageTypeCollector {
-        msgTypes.add(IMessageType { msgType })
+    override fun passOn(msgType: String, filter: Message.() -> Boolean): MessageTypeCollector =
+        addMessageType(msgType)
+
+    override fun failOn(msgType: String, filter: Message.() -> Boolean): MessageTypeCollector =
+        addMessageType(msgType)
+
+    private fun addMessageType(msgType: String): MessageTypeCollector {
+        messageTypes.add(IMessageType { msgType })
         return this@MessageTypeCollector
     }
 
-    override fun failOn(msgType: String, filter: Message.() -> Boolean): MessageTypeCollector {
-        msgTypes.add(IMessageType { msgType })
-        return this@MessageTypeCollector
+    operator fun invoke(filter: IReceiveBuilder.() -> Unit): List<IMessageType> {
+        filter()
+        return messageTypes.toList()
     }
-
 }
