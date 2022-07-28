@@ -31,10 +31,7 @@ class WaitingTasksBuffer(
     private val monitor: IResponseCollector
 ) {
     var foundFailOn: Boolean = false
-        get() = field
-        private set(value) {
-            field = value
-        }
+        private set
 
     fun matchMessage(message: Message): Boolean {
         return if(receiveRule.onMessage(message)) {
