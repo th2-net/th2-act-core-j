@@ -24,7 +24,7 @@ import mu.KotlinLogging
 
 private val LOGGER = KotlinLogging.logger {}
 
-class RequestMessageSubmitter: RequestHandler() {
+class RequestMessageSubmitter: IRequestMessageSubmitter {
 
     override fun handle(request: IRequest, requestContext: RequestContext) {
 
@@ -37,8 +37,6 @@ class RequestMessageSubmitter: RequestHandler() {
                 message = request.requestMessage,
                 parentEventID = requestContext.parentEventID
             )
-
-            super.toNextHandler(request, requestContext)
 
         } catch (e: MessageSubmissionException) {
             LOGGER.error("Failed to submit a message.", e)

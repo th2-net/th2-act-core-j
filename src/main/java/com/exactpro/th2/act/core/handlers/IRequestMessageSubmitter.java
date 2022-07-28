@@ -14,17 +14,19 @@
  * limitations under the License.
  */
 
-package com.exactpro.th2.act.core.receivers
+package com.exactpro.th2.act.core.handlers;
 
-import com.exactpro.th2.act.core.monitors.IMessageResponseMonitor
+import com.exactpro.th2.act.core.requests.IRequest;
+import com.exactpro.th2.act.core.requests.RequestContext;
 
-interface IMessageReceiverFactory {
+public interface IRequestMessageSubmitter {
 
     /**
-     * Creates a message receiver from the specified response monitor and message receiver context.
+     * Handles the specified request. If an error occurs the
+     * handler may choose to not propagate the request further.
      *
-     * @param monitor The [IMessageResponseMonitor] which the receiver should notify once the response is received.
-     * @return The message receiver as an [IMessageReceiver].
+     * @param request        The request to be handled as a {@link IRequest}.
+     * @param requestContext The {@link RequestContext} for handling the request.
      */
-    fun from(monitor: IMessageResponseMonitor): IMessageReceiver
+    void handle(IRequest request, RequestContext requestContext);
 }
