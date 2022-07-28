@@ -17,7 +17,6 @@
 package com.exactpro.th2.act.core.response
 
 import com.exactpro.th2.act.*
-import com.exactpro.th2.act.core.action.FailedResponseFoundException
 import com.exactpro.th2.act.core.messages.MessageMatches
 import com.exactpro.th2.act.core.action.NoResponseFoundException
 import com.exactpro.th2.act.core.managers.SubscriptionManager
@@ -158,13 +157,11 @@ internal class TestResponseProcessor {
 
         every { eventRouter.createErrorEvent(any(), any()) } answers { randomString().toEventID() }
 
-        assertThrows(FailedResponseFoundException::class.java) {
-            responseProcessor.process(
-                messagesMatches = messageMatches,
-                processedMessageIDs = receivedMessages.map { it.metadata.id },
-                requestContext = requestContext
-            )
-        }
+        responseProcessor.process(
+            messagesMatches = messageMatches,
+            processedMessageIDs = receivedMessages.map { it.metadata.id },
+            requestContext = requestContext
+        )
 
         verify {
             eventRouter.createErrorEvent(

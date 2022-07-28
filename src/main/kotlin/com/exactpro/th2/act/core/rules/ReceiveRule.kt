@@ -31,9 +31,9 @@ class ReceiveRule(
 
     override fun checkMessageFromConnection(message: Message): Boolean {
         if (filter.invoke(message)){
-            val filter = FilterReceiveBuilder(message).apply(filterReceive)
-            if (filter.isFilter) {
-                status = filter.status
+            val filterStatus = FilterReceiveBuilder(message).apply(filterReceive).status
+            if (filterStatus != null) {
+                status = filterStatus
                 return true
             }
         }

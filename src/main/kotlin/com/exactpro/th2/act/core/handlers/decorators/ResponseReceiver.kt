@@ -16,6 +16,7 @@
 
 package com.exactpro.th2.act.core.handlers.decorators
 
+import com.exactpro.th2.act.core.action.FailedResponseFoundException
 import com.exactpro.th2.act.core.monitors.IResponseCollector
 import com.exactpro.th2.act.core.monitors.WaitingTasksBuffer
 import com.exactpro.th2.act.core.receivers.MessagesReceiver
@@ -37,6 +38,10 @@ class ResponseReceiver(private val messagesReceiver: MessagesReceiver): AutoClos
         task.await(timeout)
 
         responseProcessor.process(collector.responses, receiveRule.processedIDs(), requestContext)
+
+        if(task.foundFailOn) {
+            throw FailedResponseFoundException("Found a message for failOn.")
+        }
     }
 
     fun cleanMessageBuffer(){

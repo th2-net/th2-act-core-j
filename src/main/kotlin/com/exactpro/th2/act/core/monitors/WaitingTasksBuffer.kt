@@ -18,6 +18,7 @@ package com.exactpro.th2.act.core.monitors
 
 import com.exactpro.th2.act.core.messages.MessageMatches
 import com.exactpro.th2.act.core.rules.ReceiveRule
+import com.exactpro.th2.common.event.Event.Status
 import com.exactpro.th2.common.grpc.Message
 import mu.KotlinLogging
 import java.util.concurrent.TimeUnit
@@ -29,10 +30,18 @@ class WaitingTasksBuffer(
     private val receiveRule: ReceiveRule,
     private val monitor: IResponseCollector
 ) {
+    var foundFailOn: Boolean = false
+        get() = field
+        private set(value) {
+            field = value
+        }
 
     fun matchMessage(message: Message): Boolean {
         return if(receiveRule.onMessage(message)) {
-            monitor.responseMatch(MessageMatches(message, receiveRule.statusReceiveBuilder()))
+            val status = receiveRule.statusReceiveBuilder()
+            if (status == Status.FAILED)
+                foundFailOn = true
+            monitor.responseMatch(MessageMatches(message, status))
             true
         } else false
     }

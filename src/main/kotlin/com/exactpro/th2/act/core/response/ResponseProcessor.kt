@@ -16,7 +16,6 @@
 
 package com.exactpro.th2.act.core.response
 
-import com.exactpro.th2.act.core.action.FailedResponseFoundException
 import com.exactpro.th2.act.core.messages.MessageMatches
 import com.exactpro.th2.act.core.action.NoResponseFoundException
 import com.exactpro.th2.act.core.requests.RequestContext
@@ -46,7 +45,6 @@ class ResponseProcessor(
                         cause = "Found a message for failOn.",
                         parentEventID = requestContext.parentEventID
                     )
-                    throw FailedResponseFoundException("Found a message for failOn.")
                 } else {
                     requestContext.eventBatchRouter.createResponseReceivedEvents(
                         messages = messagesMatches.stream().map { msgMatches -> msgMatches.message }.collect(Collectors.toList()),
