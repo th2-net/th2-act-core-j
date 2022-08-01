@@ -1,12 +1,9 @@
 variables:
   APP_NAME: 'th2-act-core'
-  MAJOR_VERSION: '0'
-  MINOR_VERSION: '0'
-  MAINTENANCE_VERSION: '1'
   NOTIFICATION_ENABLED: 'false'
   DOCKER_PUBLISH_ENABLED: 'false'
 
 include:
   - project: 'vivarium/th2/pipelines'
-    ref: master
+    ref: v2
     file: '/.gitlab-ci-java.yml'
