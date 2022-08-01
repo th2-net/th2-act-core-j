@@ -23,21 +23,16 @@ compileTestKotlin {
 }
 
 repositories {
+    mavenCentral()
     maven {
-        name "Central"
-        url "https://nexus.exactpro.com/repository/maven-central/"
+        name 'Sonatype_snapshots'
+        url 'https://s01.oss.sonatype.org/content/repositories/snapshots/'
     }
 
     maven {
-        name "Bintray"
-        url "https://nexus.exactpro.com/repository/th2-bintray/"
+        name 'Sonatype_releases'
+        url 'https://s01.oss.sonatype.org/content/repositories/releases/'
     }
-
-    maven {
-        name "Nexus"
-        url "https://nexus.exactpro.com/repository/th2-maven/"
-    }
-
     mavenLocal()
 }
 
