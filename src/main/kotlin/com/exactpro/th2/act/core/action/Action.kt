@@ -135,8 +135,12 @@ class Action<T>(
 
     fun registerCheckPoint(parentEventId: EventID?): Checkpoint {
         LOGGER.debug("Registering the checkpoint started")
-        val response: CheckpointResponse =
-            check1Service.createCheckpoint(CheckpointRequest.newBuilder().setParentEventId(parentEventId).build())
+
+        val checkpointRequest = CheckpointRequest.newBuilder()
+        if (parentEventId != null)
+            checkpointRequest.parentEventId = parentEventId
+
+        val response: CheckpointResponse = check1Service.createCheckpoint(checkpointRequest.build())
         LOGGER.debug("Registering the checkpoint ended. Response $response")
         return response.checkpoint
     }
