@@ -26,7 +26,12 @@ import com.exactpro.th2.act.core.response.NoResponseBodyFactory
 import com.exactpro.th2.act.core.response.ResponseProcessor
 import com.exactpro.th2.act.core.rules.ReceiveRule
 import com.exactpro.th2.act.core.rules.filter.IReceiveBuilder
+import com.exactpro.th2.check1.grpc.Check1Service
+import com.exactpro.th2.check1.grpc.CheckpointRequest
+import com.exactpro.th2.check1.grpc.CheckpointResponse
+import com.exactpro.th2.common.grpc.Checkpoint
 import com.exactpro.th2.common.grpc.Direction
+import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.message.direction
 import com.exactpro.th2.common.message.messageType
@@ -39,6 +44,7 @@ private val LOGGER = KotlinLogging.logger {}
 
 class Action<T>(
     private val observer: StreamObserver<T>,
+    private val check1Service: Check1Service,
     private val requestContext: RequestContext,
     private val responseReceiver: ResponseReceiver
 ) {
@@ -50,7 +56,7 @@ class Action<T>(
     fun send(
         message: Message,
         sessionAlias: String = message.sessionAlias,
-        timeout: Long,
+        timeout: Long = 1_000L,
         waitEcho: Boolean = false,
         cleanBuffer: Boolean = true
     ): Message {
@@ -125,5 +131,13 @@ class Action<T>(
 
     fun emitResult(result: T) {
         observer.onNext(result)
+    }
+
+    fun registerCheckPoint(parentEventId: EventID?): Checkpoint {
+        LOGGER.debug("Registering the checkpoint started")
+        val response: CheckpointResponse =
+            check1Service.createCheckpoint(CheckpointRequest.newBuilder().setParentEventId(parentEventId).build())
+        LOGGER.debug("Registering the checkpoint ended. Response $response")
+        return response.checkpoint
     }
 }

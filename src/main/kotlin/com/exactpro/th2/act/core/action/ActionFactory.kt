@@ -20,6 +20,7 @@ import com.exactpro.th2.act.core.managers.SubscriptionManager
 import com.exactpro.th2.act.core.requests.RequestContext
 import com.exactpro.th2.act.core.routers.EventRouter
 import com.exactpro.th2.act.core.routers.MessageRouter
+import com.exactpro.th2.check1.grpc.Check1Service
 import com.exactpro.th2.common.grpc.Checkpoint
 import com.exactpro.th2.common.grpc.EventID
 import io.grpc.Context
@@ -29,7 +30,8 @@ import java.util.concurrent.TimeUnit.MILLISECONDS
 class ActionFactory(
     private val messageRouter: MessageRouter,
     private val eventRouter: EventRouter,
-    private val subscriptionManager: SubscriptionManager
+    private val subscriptionManager: SubscriptionManager,
+    private val check1Service: Check1Service
 ) {
     fun <T> createAction(
         observer: StreamObserver<T>,
@@ -50,6 +52,6 @@ class ActionFactory(
             timeout
         )
 
-        return ActionBuilder(observer, requestContext, messageBufferSize)
+        return ActionBuilder(observer, check1Service, requestContext, messageBufferSize)
     }
 }

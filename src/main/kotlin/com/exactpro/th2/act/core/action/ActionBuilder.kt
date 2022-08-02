@@ -19,6 +19,7 @@ package com.exactpro.th2.act.core.action
 import com.exactpro.th2.act.core.receivers.factories.MessageReceiverFactory
 import com.exactpro.th2.act.core.handlers.decorators.ResponseReceiver
 import com.exactpro.th2.act.core.requests.RequestContext
+import com.exactpro.th2.check1.grpc.Check1Service
 import com.exactpro.th2.common.grpc.Message
 import io.grpc.stub.StreamObserver
 import mu.KotlinLogging
@@ -27,6 +28,7 @@ private val LOGGER = KotlinLogging.logger {}
 
 class ActionBuilder<T>(
     private val observer: StreamObserver<T>,
+    private val check1Service: Check1Service,
     private val requestContext: RequestContext,
     private val messageBufferSize: Int
 ) {
@@ -45,7 +47,7 @@ class ActionBuilder<T>(
 
         ResponseReceiver(receiverFactory.create()).use {
             try {
-                action.invoke(Action(observer, requestContext, it))
+                action.invoke(Action(observer, check1Service, requestContext, it))
                 observer.onCompleted()
             } catch (ex: NoResponseFoundException) {
                 LOGGER.error("Action did not finish correctly - ${ex.message}")

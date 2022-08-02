@@ -40,6 +40,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 import com.exactpro.th2.act.core.messages.message
+import com.exactpro.th2.check1.grpc.Check1Service
 
 class TestDSL {
     private lateinit var messageRouter: MessageRouter
@@ -49,6 +50,7 @@ class TestDSL {
     private lateinit var actionFactory: ActionFactory
     private var observer: StreamObserver<Message> = spyk()
     private val eventBatchRouter: StubMessageRouter<EventBatch> = StubMessageRouter()
+    private val check1Service: Check1Service = spyk()
 
     private val executorService: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor()
 
@@ -65,7 +67,7 @@ class TestDSL {
 
         listeners.forEach { (direction, listener) -> subscriptionManager.register(direction, listener) }
 
-        actionFactory = ActionFactory(messageRouter, eventRouter, subscriptionManager)
+        actionFactory = ActionFactory(messageRouter, eventRouter, subscriptionManager, check1Service)
     }
 
     private fun getMockListener(name: String? = null): MessageBatchListener {
