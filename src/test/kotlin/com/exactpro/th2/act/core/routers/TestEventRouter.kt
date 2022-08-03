@@ -54,8 +54,8 @@ internal class TestEventRouter {
      * 10) Should throw a EventSubmissionException if an error occurs while submitting an event. V
      */
 
-    private lateinit var eventBatchRouter: StubMessageRouter<EventBatch>
-    private lateinit var eventRouter: EventRouter
+    lateinit var eventBatchRouter: StubMessageRouter<EventBatch>
+    lateinit var eventRouter: EventRouter
 
     @BeforeEach
     internal fun setUp() {
@@ -250,7 +250,7 @@ internal class TestEventRouter {
 
         @JvmStatic
         @SuppressWarnings("unused")
-        private fun provideEventCreationCallers(): Stream<Arguments> {
+        fun provideEventCreationCallers(): Stream<Arguments> {
             return Stream.of(
                 Arguments.of(Consumer { eventRouter: EventRouter ->
                     eventRouter.createParentEvent(

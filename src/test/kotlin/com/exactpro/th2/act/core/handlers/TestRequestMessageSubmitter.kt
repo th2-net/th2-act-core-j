@@ -46,7 +46,7 @@ internal class TestRequestMessageSubmitter {
     /**
      * Creates a [RequestContext] from the specified message batch and event batch routers.
      */
-    private fun createRequestContext(messageRouter: MessageRouter, eventRouter: EventRouter): RequestContext =
+    fun createRequestContext(messageRouter: MessageRouter, eventRouter: EventRouter): RequestContext =
         RequestContext(
             rpcName = randomString(),
             requestName = randomString(),
@@ -58,12 +58,12 @@ internal class TestRequestMessageSubmitter {
             1000
         )
 
-    private lateinit var messageSubmitter: RequestMessageSubmitter
-    private lateinit var request: IRequest
-    private lateinit var messageRouter: MessageRouter
-    private lateinit var eventRouter: EventRouter
-    private lateinit var nextHandler: IRequestMessageSubmitter
-    private lateinit var requestContext: RequestContext
+    lateinit var messageSubmitter: RequestMessageSubmitter
+    lateinit var request: IRequest
+    lateinit var messageRouter: MessageRouter
+    lateinit var eventRouter: EventRouter
+    lateinit var nextHandler: IRequestMessageSubmitter
+    lateinit var requestContext: RequestContext
 
     @BeforeEach
     internal fun setUp() {

@@ -52,12 +52,12 @@ internal class TestMultipleMessageReceiver {
     /**
      * Returns a common connection ID (used for convenient to omit the details of the ID).
      */
-    private fun commonConnectionID(): ConnectionID = "Common Test Alias".toConnectionID()
+    fun commonConnectionID(): ConnectionID = "Common Test Alias".toConnectionID()
 
     /**
      * Returns a [MultipleMessageReceiver] created with the specified [ICheckRule] and [ICheckRuleFactory]s.
      */
-    private fun receiver(
+    fun receiver(
         firstRule: ICheckRule, vararg followUpRuleFactory: ICheckRuleFactory
     ): MultipleMessageReceiver {
         return MultipleMessageReceiver(subscriptionManager, responseMonitor, firstRule, followUpRuleFactory.asList())
@@ -66,7 +66,7 @@ internal class TestMultipleMessageReceiver {
     /**
      * Returns a [MultipleMessageReceiver] created with the specified [ICheckRule] and [ICheckRuleFactory] iterable.
      */
-    private fun receiver(
+    fun receiver(
         firstRule: ICheckRule, followUpRuleFactories: Iterable<ICheckRuleFactory>
     ): MultipleMessageReceiver {
         return receiver(firstRule, *followUpRuleFactories.toList().toTypedArray())
@@ -76,7 +76,7 @@ internal class TestMultipleMessageReceiver {
      * Returns a [MultipleMessageReceiver] created with the specified [ICheckRule] and [ICheckRuleFactory] iterable.
      * This receiver will be created so that it returns all matched messages.
      */
-    private fun returnsAllReceiver(
+    fun returnsAllReceiver(
         firstRule: ICheckRule, followUpRuleFactories: Iterable<ICheckRuleFactory>
     ): MultipleMessageReceiver {
         return MultipleMessageReceiver(
@@ -88,8 +88,8 @@ internal class TestMultipleMessageReceiver {
         )
     }
 
-    private lateinit var responseMonitor: IMessageResponseMonitor
-    private lateinit var subscriptionManager: SubscriptionManager
+    lateinit var responseMonitor: IMessageResponseMonitor
+    lateinit var subscriptionManager: SubscriptionManager
 
     @BeforeEach
     internal fun setUp() {

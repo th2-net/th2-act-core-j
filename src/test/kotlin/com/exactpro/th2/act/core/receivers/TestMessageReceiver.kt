@@ -48,18 +48,18 @@ internal class TestMessageReceiver {
     /**
      * Returns a [MessageReceiver] created with the specified [ICheckRule] for this direction.
      */
-    private fun Direction.receiver(checkRule: ICheckRule): MessageReceiver {
+    fun Direction.receiver(checkRule: ICheckRule): MessageReceiver {
         return MessageReceiver(subscriptionManager, responseMonitor, checkRule, this)
     }
 
     /**
      * Returns a common connection ID (used for convenient to omit the details of the ID).
      */
-    private fun commonConnectionID(): ConnectionID = "Common Test Alias".toConnectionID()
+    fun commonConnectionID(): ConnectionID = "Common Test Alias".toConnectionID()
 
 
-    private lateinit var responseMonitor: IMessageResponseMonitor
-    private lateinit var subscriptionManager: SubscriptionManager
+    lateinit var responseMonitor: IMessageResponseMonitor
+    lateinit var subscriptionManager: SubscriptionManager
 
     @BeforeEach
     internal fun setUp() {

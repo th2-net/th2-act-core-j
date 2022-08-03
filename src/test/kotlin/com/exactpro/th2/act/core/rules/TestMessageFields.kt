@@ -47,11 +47,11 @@ internal class TestMessageFields {
      * 6) Should not match messages with nested field values different from the ones expected. ? No requirement
      */
 
-    private fun IMessageType.withFields(fields: Map<IField, String>): Message {
+    fun IMessageType.withFields(fields: Map<IField, String>): Message {
         return this.withFields(*fields.entries.map { it.key to it.value }.toTypedArray())
     }
 
-    private fun IMessageType.withFields(vararg field: Pair<IField, String>): Message = Message
+    fun IMessageType.withFields(vararg field: Pair<IField, String>): Message = Message
             .newBuilder()
             .setMetadata(MessageMetadata.newBuilder().setMessageType(this.typeName))
             .putAllFields(field.associate { entry -> entry.first.fieldName to entry.second.toValue() })
@@ -173,7 +173,7 @@ internal class TestMessageFields {
 
         @JvmStatic
         @SuppressWarnings("unused")
-        private fun provideDistinctMessageTypes(): Stream<Arguments> {
+        fun provideDistinctMessageTypes(): Stream<Arguments> {
             return 3.randomMessageTypes().flatMap { firstType ->
                 3.randomMessageTypes()
                         .filter { secondType -> firstType != secondType }

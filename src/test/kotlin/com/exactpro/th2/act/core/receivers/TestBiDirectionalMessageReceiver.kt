@@ -38,11 +38,11 @@ import strikt.assertions.isSameInstanceAs
 
 internal class TestBiDirectionalMessageReceiver {
 
-    private val connectionID = randomConnectionID()
-    private val subscriptionManager = SubscriptionManager()
-    private val monitor: IMessageResponseMonitor = mockk { justRun { responseReceived() } }
+    val connectionID = randomConnectionID()
+    val subscriptionManager = SubscriptionManager()
+    val monitor: IMessageResponseMonitor = mockk { justRun { responseReceived() } }
 
-    private fun receiver(outgoing: ICheckRule, incomingSupplier: (Message) -> ICheckRule): AbstractMessageReceiver =
+    fun receiver(outgoing: ICheckRule, incomingSupplier: (Message) -> ICheckRule): AbstractMessageReceiver =
         BiDirectionalMessageReceiver(
             subscriptionManager = subscriptionManager,
             monitor = monitor,
@@ -152,8 +152,8 @@ internal class TestBiDirectionalMessageReceiver {
         verify(exactly = 0) { monitor.responseReceived() }
     }
 
-    private class IdentityRule(
-        private val message: Message, connectionId: ConnectionID
+    class IdentityRule(
+        val message: Message, connectionId: ConnectionID
     ): AbstractSingleConnectionRule(connectionId) {
 
         override fun checkMessageFromConnection(message: Message): Boolean = (this.message === message)

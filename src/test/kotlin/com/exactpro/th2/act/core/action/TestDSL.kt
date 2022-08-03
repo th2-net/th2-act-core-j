@@ -43,16 +43,16 @@ import com.exactpro.th2.act.core.messages.message
 import com.exactpro.th2.check1.grpc.Check1Service
 
 class TestDSL {
-    private lateinit var messageRouter: MessageRouter
-    private lateinit var eventRouter: EventRouter
-    private val parentEventID: EventID = EventID.newBuilder().setId("eventId").build()
-    private val subscriptionManager: SubscriptionManager = spyk()
-    private lateinit var actionFactory: ActionFactory
-    private var observer: StreamObserver<Message> = spyk()
-    private val eventBatchRouter: StubMessageRouter<EventBatch> = StubMessageRouter()
-    private val check1Service: Check1Service = spyk()
+    lateinit var messageRouter: MessageRouter
+    lateinit var eventRouter: EventRouter
+    val parentEventID: EventID = EventID.newBuilder().setId("eventId").build()
+    val subscriptionManager: SubscriptionManager = spyk()
+    lateinit var actionFactory: ActionFactory
+    var observer: StreamObserver<Message> = spyk()
+    val eventBatchRouter: StubMessageRouter<EventBatch> = StubMessageRouter()
+    val check1Service: Check1Service = spyk()
 
-    private val executorService: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor()
+    val executorService: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor()
 
     @BeforeEach
     internal fun setUp() {
@@ -70,7 +70,7 @@ class TestDSL {
         actionFactory = ActionFactory(messageRouter, eventRouter, subscriptionManager, check1Service)
     }
 
-    private fun getMockListener(name: String? = null): MessageBatchListener {
+    fun getMockListener(name: String? = null): MessageBatchListener {
         return if (name == null) {
             mockk { justRun { handler(any(), any()) } }
         } else {
@@ -78,7 +78,7 @@ class TestDSL {
         }
     }
 
-    private fun messageBuild(
+    fun messageBuild(
         messageType: String,
         sessionAlias: String,
         direction: Direction,
@@ -335,7 +335,7 @@ class TestDSL {
         checkingSentEvent("DQ126")
     }
 
-    private fun createDQ126(): Message =
+    fun createDQ126(): Message =
         message {
             metadata {
                 messageType = "DQ126"
@@ -343,7 +343,7 @@ class TestDSL {
             }
         }
 
-    private fun updateDQ126(dq126: Message, segment: String): Message = dq126.toBuilder()
+    fun updateDQ126(dq126: Message, segment: String): Message = dq126.toBuilder()
         .putFields("segment_number", Value.newBuilder().setSimpleValue(segment).build())
         .apply { this.sequence = segment.toLong() }.build()
 
@@ -585,7 +585,7 @@ class TestDSL {
         }
     }
 
-    private fun checkingSentEvent(messageType: String){
+    fun checkingSentEvent(messageType: String){
         expect {
             that(eventBatchRouter.sent.eventsList).any {
                 get { parentId }.isEqualTo(parentEventID)

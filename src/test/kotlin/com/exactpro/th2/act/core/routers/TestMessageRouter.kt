@@ -37,8 +37,8 @@ internal class TestMessageRouter {
      * 4) Should throw a RuntimeException if an error occurs while submitting the event. V
      */
 
-    private lateinit var messageBatchRouter: StubMessageRouter<MessageBatch>
-    private lateinit var messageRouter: MessageRouter
+    lateinit var messageBatchRouter: StubMessageRouter<MessageBatch>
+    lateinit var messageRouter: MessageRouter
 
     @BeforeEach
     internal fun setUp() {

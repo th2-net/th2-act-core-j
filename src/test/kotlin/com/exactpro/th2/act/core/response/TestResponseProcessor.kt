@@ -47,7 +47,7 @@ internal class TestResponseProcessor {
     /**
      * Creates a [RequestContext] from the specified event batch router.
      */
-    private fun createRequestContext(eventRouter: EventRouter): RequestContext = RequestContext(
+    fun createRequestContext(eventRouter: EventRouter): RequestContext = RequestContext(
         rpcName = randomString(),
         requestName = randomString(),
         messageBatchRouter = mockk { },
@@ -58,8 +58,8 @@ internal class TestResponseProcessor {
         1_000
     )
 
-    private lateinit var eventRouter: EventRouter
-    private lateinit var requestContext: RequestContext
+    lateinit var eventRouter: EventRouter
+    lateinit var requestContext: RequestContext
 
     @BeforeEach
     internal fun setUp() {

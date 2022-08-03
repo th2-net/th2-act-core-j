@@ -33,7 +33,7 @@ internal class TestSubscriptionManager {
      * Returns a mock [MessageBatchListener] that just runs when it's handler method is invoked. The name of the mock
      * can optionally be specified.
      */
-    private fun getMockListener(name: String? = null): MessageBatchListener {
+    fun getMockListener(name: String? = null): MessageBatchListener {
         return if (name == null) {
             mockk { justRun { handler(any(), any()) } }
         } else {
@@ -41,7 +41,7 @@ internal class TestSubscriptionManager {
         }
     }
 
-    private lateinit var subscriptionManager: SubscriptionManager
+    lateinit var subscriptionManager: SubscriptionManager
 
     @BeforeEach
     internal fun setUp() {

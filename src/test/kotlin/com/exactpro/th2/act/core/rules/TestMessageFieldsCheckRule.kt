@@ -41,12 +41,12 @@ internal class TestMessageFieldsCheckRule {
     /**
      * Returns a common connection ID (used for convenient to omit the details of the ID).
      */
-    private fun someCommonConnectionID(): ConnectionID = "Test Alias".toConnectionID()
+    fun someCommonConnectionID(): ConnectionID = "Test Alias".toConnectionID()
 
     /**
      * Returns an array of common message fields (used for convenience to omit the details of the fields).
      */
-    private fun someCommonFields(): Array<Pair<IField, String>> = arrayOf(
+    fun someCommonFields(): Array<Pair<IField, String>> = arrayOf(
         TestField.CLIENT_ORDER_ID to "Test ID 1", TestField.DISPLAY_QTY to "Test Quantity 1"
     )
 
