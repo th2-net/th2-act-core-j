@@ -41,7 +41,7 @@ repositories {
 dependencies {
     api platform("com.exactpro.th2:bom:3.0.0")
 
-    api "com.exactpro.th2:common:3.26.4"
+    api "com.exactpro.th2:common:3.39.3"
     api "com.exactpro.th2:grpc-check1:3.4.2"
 
     implementation "io.github.microutils:kotlin-logging:1.12.5"
