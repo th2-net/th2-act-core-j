@@ -151,6 +151,7 @@ class Action<T>(
             )
 
             checkpointRequest.parentEventId = eventID
+            requestContext.parentEventID = eventID
         }
 
         val response: CheckpointResponse = check1Service.createCheckpoint(checkpointRequest.build())

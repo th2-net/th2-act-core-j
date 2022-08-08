@@ -41,7 +41,7 @@ data class RequestContext(
     val requestName: String,
     val messageBatchRouter: MessageRouter,
     val eventBatchRouter: EventRouter,
-    val parentEventID: EventID,
+    var parentEventID: EventID,
     val checkpoint: Checkpoint,
     val subscriptionManager: ISubscriptionManager,
     val timeout: Long,
