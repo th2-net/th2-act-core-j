@@ -40,6 +40,7 @@ import com.exactpro.th2.common.message.sequence
 import com.exactpro.th2.common.message.sessionAlias
 import io.grpc.stub.StreamObserver
 import mu.KotlinLogging
+import java.time.Instant
 
 private val LOGGER = KotlinLogging.logger {}
 
@@ -145,7 +146,7 @@ class Action<T>(
             val eventID = requestContext.eventBatchRouter.createParentEvent(
                 parentEventId = parentEventId,
                 rpcName = requestContext.rpcName,
-                requestName = requestContext.requestName,
+                requestName = "${requestContext.requestName} - ${Instant.now()}",
                 status = Event.Status.PASSED,
                 description = description
             )
