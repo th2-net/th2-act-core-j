@@ -112,18 +112,21 @@ class EventRouter(private val eventBatchRouter: MessageRouter<EventBatch>) {
      *
      * @param message The message to be included in the event.
      * @param parentEventID The ID of the parent event as an [EventID]
+     * @param rpcName  The name of the service method that is being called (Will be a part of the event name).
+     * @param description Description of the event as a string.
      *
      * @return The ID of the created event as an [EventID].
      *
      * @throws EventSubmissionException If an error occurs while creating the specified event.
      */
-    fun createSendMessageEvent(message: Message, parentEventID: EventID? = null): EventID {
+    fun createSendMessageEvent(message: Message, parentEventID: EventID? = null, rpcName: String, description: String): EventID {
         return createEvent(
             Event.Status.PASSED,
-            type = "Outgoing Message",
+            type = rpcName,
             name = "Send ${message.metadata.messageType} message to connectivity",
             body = listOf(message.toTreeTable()),
-            parentEventID = parentEventID
+            parentEventID = parentEventID,
+            description = description
         )
     }
 
@@ -134,19 +137,21 @@ class EventRouter(private val eventBatchRouter: MessageRouter<EventBatch>) {
      * @param messages The [List] of received [Message]s to be included in the event.
      * @param eventStatus The status to be set for the response received events.
      * @param parentEventID The ID of the parent event as an [EventID]
+     * @param description Description of the event as a string.
      *
      * @throws EventSubmissionException If an error occurs while creating the specified events.
      */
     fun createResponseReceivedEvents(
-        messages: List<Message>, eventStatus: Event.Status, parentEventID: EventID? = null
+        messages: List<Message>, eventStatus: Event.Status, parentEventID: EventID? = null, description: String, rpcName: String
     ) {
         val events = Array(messages.size) { messages[it] }.map { message ->
             Event.start()
-                    .name("Received a ${message.messageType} message")
-                    .type("Received Message")
-                    .status(eventStatus)
-                    .bodyData(message.toTreeTable())
-                    .messageID(message.metadata.id)
+                .name("Received a ${message.messageType} message")
+                .type(rpcName)
+                .status(eventStatus)
+                .bodyData(message.toTreeTable())
+                .messageID(message.metadata.id)
+                .description(description)
         }
 
         try {
@@ -215,19 +220,19 @@ class EventRouter(private val eventBatchRouter: MessageRouter<EventBatch>) {
     /**
      * Creates an error event with the specified cause. The parent event can optionally be specified.
      *
-     * @param cause The cause of the error as a string.
+     * @param description The cause of the error as a string.
      * @param parentEventID The ID of the parent event as an [EventID]
      *
      * @return The ID of the created event as an [EventID].
      *
      * @throws EventSubmissionException If an error occurs while creating the specified event.
      */
-    fun createErrorEvent(cause: String, parentEventID: EventID? = null): EventID {
+    fun createErrorEvent(description: String, parentEventID: EventID? = null): EventID {
         return createEvent(
             Event.Status.FAILED,
             type = "Error",
             name = "An Error has occurred",
-            description = cause,
+            description = description,
             parentEventID = parentEventID
         )
     }
@@ -241,9 +246,9 @@ class EventRouter(private val eventBatchRouter: MessageRouter<EventBatch>) {
      */
     private fun createEvent(
         status: Event.Status,
-        type: String = "No Type",
-        name: String = "No Name",
-        description: String = "No Description",
+        type: String,
+        name: String,
+        description: String,
         body: Collection<IBodyData> = emptyList(),
         parentEventID: EventID? = null,
         linkedMessages: Collection<MessageID> = emptyList()

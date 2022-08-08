@@ -76,7 +76,7 @@ internal class TestRequestMessageSubmitter {
         }
 
         eventRouter = mockk {
-            every { createSendMessageEvent(any(), any()) } answers { randomString().toEventID() }
+            every { createSendMessageEvent(any(), any(), any(), any()) } answers { randomString().toEventID() }
         }
 
         requestContext = createRequestContext(messageRouter = messageRouter, eventRouter = eventRouter)
@@ -94,7 +94,12 @@ internal class TestRequestMessageSubmitter {
         messageSubmitter.handle(request, requestContext)
 
         verify {
-            eventRouter.createSendMessageEvent(request.requestMessage, parentEventID = requestContext.parentEventID)
+            eventRouter.createSendMessageEvent(
+                message = request.requestMessage,
+                parentEventID = requestContext.parentEventID,
+                rpcName = requestContext.rpcName,
+                description = request.requestDescription
+            )
         }
     }
 }

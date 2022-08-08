@@ -53,6 +53,7 @@ class TestDSL {
     val check1Service: Check1Service = spyk()
 
     val executorService: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor()
+    val rpcName = randomString()
 
     @BeforeEach
     internal fun setUp() {
@@ -111,7 +112,7 @@ class TestDSL {
         )
 
         actionFactory.apply {
-            createAction(observer, randomString(), randomString(), parentEventID, 2000)
+            createAction(observer, rpcName, randomString(), parentEventID, 2000)
                 .preFilter { msg -> msg.sessionAlias == "sessionAlias"
                         && (msg.direction == Direction.FIRST || msg.direction == Direction.SECOND) }
                 .execute {
@@ -138,7 +139,7 @@ class TestDSL {
         }
 
         actionFactory.apply {
-            createAction(observer, randomString(), randomString(), parentEventID, 2000)
+            createAction(observer, rpcName, randomString(), parentEventID, 2000)
                 .preFilter { msg -> msg.direction == Direction.FIRST
                         && (msg.sessionAlias == "sessionAlias" || msg.sessionAlias == "anotherSessionAlias") }
                 .execute {
@@ -171,7 +172,7 @@ class TestDSL {
         }
 
         actionFactory.apply {
-            createAction(observer, randomString(), randomString(), parentEventID, 3000)
+            createAction(observer, rpcName, randomString(), parentEventID, 3000)
                 .preFilter { msg -> msg.direction == Direction.FIRST && msg.sessionAlias == "anotherSessionAlias" }
                 .execute {
                     val quote: Message = send(messages[0], "sessionAlias", 1000)
@@ -232,7 +233,7 @@ class TestDSL {
         }
 
         actionFactory.apply {
-            createAction(observer, randomString(), randomString(), parentEventID, 10000)
+            createAction(observer, rpcName, randomString(), parentEventID, 10000)
                 .preFilter { msg -> msg.direction == Direction.FIRST && msg.sessionAlias == "sessionAlias" }
                 .execute {
                     send(messages[3], "sessionAlias", 1000)
@@ -284,7 +285,7 @@ class TestDSL {
         }
 
         actionFactory.apply {
-            createAction(observer, randomString(), randomString(), parentEventID, 10_000)
+            createAction(observer, rpcName, randomString(), parentEventID, 10_000)
                 .preFilter { msg -> msg.direction == Direction.FIRST && (msg.sessionAlias == "sessionAlias" || msg.sessionAlias == "anotherSessionAlias") }
                 .execute {
                     expectedMessages.forEach {
@@ -357,7 +358,7 @@ class TestDSL {
         )
 
         actionFactory.apply {
-            createAction(observer, randomString(), randomString(), parentEventID, 10000)
+            createAction(observer, rpcName, randomString(), parentEventID, 10000)
                 .preFilter { msg -> msg.sessionAlias == "sessionAlias" && (msg.direction == Direction.FIRST || msg.direction == Direction.SECOND) }
                 .execute {
                     executorService.schedule(
@@ -390,7 +391,7 @@ class TestDSL {
             messageBuild("OrderCancelReplaceRequest", "sessionAlias", Direction.FIRST, 2L)
         )
         actionFactory.apply {
-            createAction(observer, randomString(), randomString(), parentEventID, 10000)
+            createAction(observer, rpcName, randomString(), parentEventID, 10000)
                 .preFilter { msg -> msg.direction == Direction.FIRST && msg.sessionAlias == "sessionAlias" }
                 .execute {
                     executorService.schedule(
@@ -431,7 +432,7 @@ class TestDSL {
 
 
         actionFactory.apply {
-            createAction(observer, randomString(), randomString(), parentEventID, 10000)
+            createAction(observer, rpcName, randomString(), parentEventID, 10000)
                 .preFilter { msg -> (msg.direction == Direction.FIRST || msg.direction == Direction.SECOND) && msg.sessionAlias == "sessionAlias" }
                 .execute {
                     send(
@@ -491,7 +492,7 @@ class TestDSL {
         }
 
         actionFactory.apply {
-            createAction(observer, randomString(), randomString(), parentEventID, 10000)
+            createAction(observer, rpcName, randomString(), parentEventID, 10000)
                 .preFilter { msg -> msg.direction == Direction.FIRST && msg.sessionAlias == "sessionAlias" }
                 .execute {
                     send(messages[3], "sessionAlias", 1000)
@@ -536,7 +537,7 @@ class TestDSL {
         }
 
         actionFactory.apply {
-            createAction(observer, randomString(), randomString(), parentEventID, 10000)
+            createAction(observer, rpcName, randomString(), parentEventID, 10000)
                 .preFilter { msg -> msg.direction == Direction.FIRST && msg.sessionAlias == "sessionAlias" }
                 .execute {
                     send(messages[0], "sessionAlias", 1000)
@@ -569,7 +570,7 @@ class TestDSL {
     fun `the deadline has ended`() {
         val timeout = 3L
         actionFactory.apply {
-            createAction(observer, randomString(), randomString(), parentEventID, timeout)
+            createAction(observer, rpcName, randomString(), parentEventID, timeout)
                 .preFilter { msg -> msg.direction == Direction.FIRST && msg.sessionAlias == "anotherSessionAlias" }
                 .execute {
                     send(
@@ -591,7 +592,7 @@ class TestDSL {
                 get { parentId }.isEqualTo(parentEventID)
                 get { status }.isEqualTo(EventStatus.SUCCESS)
                 get { name }.isEqualTo("Received a $messageType message")
-                get { type }.contains("Received Message")
+                get { type }.contains(rpcName)
             }
         }
     }

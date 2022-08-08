@@ -24,6 +24,7 @@ import java.util.stream.Collectors
 
 class ResponseProcessor(
     private val noResponseBodyFactory: IBodyDataFactory,
+    private val description: String
 ): IResponseProcessor{
 
     override fun process(
@@ -42,14 +43,16 @@ class ResponseProcessor(
             messagesMatches.forEach {
                 if (it.isMatchesFail()) {
                     requestContext.eventBatchRouter.createErrorEvent(
-                        cause = "Found a message for failOn.",
+                        description = "Found a message for failOn.",
                         parentEventID = requestContext.parentEventID
                     )
                 } else {
                     requestContext.eventBatchRouter.createResponseReceivedEvents(
                         messages = messagesMatches.stream().map { msgMatches -> msgMatches.message }.collect(Collectors.toList()),
                         eventStatus = it.status,
-                        parentEventID = requestContext.parentEventID
+                        parentEventID = requestContext.parentEventID,
+                        rpcName = requestContext.rpcName,
+                        description = description
                     )
                 }
             }

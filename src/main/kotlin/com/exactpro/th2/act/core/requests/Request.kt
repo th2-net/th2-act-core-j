@@ -21,7 +21,7 @@ import com.google.protobuf.TextFormat
 
 class Request(
     private val requestMessage: Message,
-    private val requestDescription: String = "No Description"
+    private val requestDescription: String
 ): IRequest {
 
     override fun getRequestMessage(): Message = requestMessage

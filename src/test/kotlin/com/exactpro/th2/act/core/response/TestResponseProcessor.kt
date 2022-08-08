@@ -70,19 +70,22 @@ internal class TestResponseProcessor {
     @Test
     fun `test should create a response processor`() {
         ResponseProcessor(
-            noResponseBodyFactory = NoResponseBodyFactory(listOf(TestMessageType.NEW_ORDER_SINGLE))
+            noResponseBodyFactory = NoResponseBodyFactory(listOf(TestMessageType.NEW_ORDER_SINGLE)),
+            description = randomString()
         )
     }
 
     @ParameterizedTest
     @EnumSource(value = RequestStatus.Status::class, mode = EnumSource.Mode.EXCLUDE, names = ["UNRECOGNIZED"])
     fun `test should submit a response received event`(requestStatus: RequestStatus.Status) {
+        val description = randomString()
         val responseProcessor = ResponseProcessor(
-            noResponseBodyFactory = NoResponseBodyFactory(listOf(TestMessageType.NEW_ORDER_SINGLE))
+            noResponseBodyFactory = NoResponseBodyFactory(listOf(TestMessageType.NEW_ORDER_SINGLE)),
+            description = description
         )
 
         val processedMessages = randomMessage()
-        every { eventRouter.createResponseReceivedEvents(any(), any(), any()) } answers { randomString().toEventID() }
+        every { eventRouter.createResponseReceivedEvents(any(), any(), any(), any(), any()) } answers { randomString().toEventID() }
 
         val messageMatches = mutableListOf(MessageMatches(processedMessages, Status.PASSED))
 
@@ -98,7 +101,9 @@ internal class TestResponseProcessor {
             eventRouter.createResponseReceivedEvents(
                 messages = capture(responseMessagesSlot),
                 eventStatus = Status.PASSED,
-                parentEventID = requestContext.parentEventID
+                parentEventID = requestContext.parentEventID,
+                rpcName = requestContext.rpcName,
+                description = description
             )
         }
 
@@ -112,7 +117,8 @@ internal class TestResponseProcessor {
         val noResponseBodyFactory = NoResponseBodyFactory(listOf(TestMessageType.NEW_ORDER_SINGLE))
 
         val responseProcessor = ResponseProcessor(
-            noResponseBodyFactory = noResponseBodyFactory
+            noResponseBodyFactory = noResponseBodyFactory,
+            description = randomString()
         )
 
         val processedMessages = 5 of { randomMessage() }
@@ -153,6 +159,7 @@ internal class TestResponseProcessor {
 
         val responseProcessor = ResponseProcessor(
             noResponseBodyFactory = NoResponseBodyFactory(listOf(TestMessageType.NEW_ORDER_SINGLE)),
+            description = randomString()
         )
 
         every { eventRouter.createErrorEvent(any(), any()) } answers { randomString().toEventID() }
@@ -165,7 +172,7 @@ internal class TestResponseProcessor {
 
         verify {
             eventRouter.createErrorEvent(
-                cause = "Found a message for failOn.",
+                description = "Found a message for failOn.",
                 parentEventID = requestContext.parentEventID
             )
         }
@@ -174,12 +181,13 @@ internal class TestResponseProcessor {
     @Test
     fun `test should not send response to client`() {
         val responseProcessor = ResponseProcessor(
-            noResponseBodyFactory = NoResponseBodyFactory(listOf(TestMessageType.NEW_ORDER_SINGLE))
+            noResponseBodyFactory = NoResponseBodyFactory(listOf(TestMessageType.NEW_ORDER_SINGLE)),
+            description = randomString()
         )
 
         val receivedMessage = TestMessageType.REJECT.toRandomMessage()
 
-        every { eventRouter.createResponseReceivedEvents(any(), any(), any()) } answers { randomString().toEventID() }
+        every { eventRouter.createResponseReceivedEvents(any(), any(), any(), any(), any()) } answers { randomString().toEventID() }
 
         responseProcessor.process(
             messagesMatches = listOf(MessageMatches(randomMessage(), Status.PASSED)),

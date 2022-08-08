@@ -58,7 +58,8 @@ class Action<T>(
         sessionAlias: String = message.sessionAlias,
         timeout: Long = 1_000L,
         waitEcho: Boolean = false,
-        cleanBuffer: Boolean = true
+        cleanBuffer: Boolean = true,
+        description: String = ""
     ): Message {
         checkingContext()
 
@@ -67,7 +68,7 @@ class Action<T>(
             sequencePreviousMessage.clear()
         }
 
-        val request = Request(message)
+        val request = Request(message, description)
         requestMessageSubmitter.handle(request, requestContext)
 
         return if (waitEcho) {
@@ -81,6 +82,7 @@ class Action<T>(
         timeout: Long,
         sessionAlias: String,
         direction: Direction = Direction.SECOND,
+        description: String = "",
         filter: IReceiveBuilder.() -> Unit
     ): Message {
         checkingContext()
@@ -102,7 +104,7 @@ class Action<T>(
                 && msg.direction == direction
                 && msg.sequence > sequencePrevious
         }
-        val responseProcessor = ResponseProcessor(NoResponseBodyFactory(MessageTypeCollector().apply(filter).messageTypes ))
+        val responseProcessor = ResponseProcessor(NoResponseBodyFactory(MessageTypeCollector().apply(filter).messageTypes), description)
         val collector = CountResponseCollector.singleResponse()
         responseReceiver.handle(requestContext, responseProcessor, deadline, receiveRule, collector)
 

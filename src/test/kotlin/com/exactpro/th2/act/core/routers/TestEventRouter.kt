@@ -130,7 +130,7 @@ internal class TestEventRouter {
     fun `test should create send message event`() {
         val message = randomMessage()
         val parentEventID = randomString().toEventID()
-        val eventID = eventRouter.createSendMessageEvent(message, parentEventID)
+        val eventID = eventRouter.createSendMessageEvent(message, parentEventID, randomString(), randomString())
 
         expect {
             that(eventBatchRouter.sent.eventsCount).isEqualTo(1)
@@ -157,7 +157,9 @@ internal class TestEventRouter {
         eventRouter.createResponseReceivedEvents(
             messages = messages.toList(),
             eventStatus = eventStatus,
-            parentEventID = parentEventID
+            parentEventID = parentEventID,
+            rpcName = randomString(),
+            description = randomString()
         )
 
         expect {
@@ -261,14 +263,16 @@ internal class TestEventRouter {
                 }),
                 Arguments.of(Consumer { eventRouter: EventRouter ->
                     eventRouter.createErrorEvent(
-                        cause = randomString(),
+                        description = randomString(),
                         parentEventID = randomString().toEventID()
                     )
                 }),
                 Arguments.of(Consumer { eventRouter: EventRouter ->
                     eventRouter.createSendMessageEvent(
                         message = randomMessage(),
-                        parentEventID = randomString().toEventID()
+                        parentEventID = randomString().toEventID(),
+                        rpcName = randomString(),
+                        description = randomString()
                     )
                 }),
                 Arguments.of(Consumer { eventRouter: EventRouter ->
@@ -288,7 +292,9 @@ internal class TestEventRouter {
                     eventRouter.createResponseReceivedEvents(
                         messages = 5.of { randomMessage() }.toList(),
                         eventStatus = Status.values().random(),
-                        parentEventID = randomString().toEventID()
+                        parentEventID = randomString().toEventID(),
+                        rpcName = randomString(),
+                        description = randomString()
                     )
                 })
             )
