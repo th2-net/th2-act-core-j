@@ -17,7 +17,6 @@
 package com.exactpro.th2.act.core.routers
 
 import com.exactpro.th2.act.core.messages.MessageMatches
-import com.exactpro.th2.act.core.requests.IRequest
 import com.exactpro.th2.act.core.response.IBodyDataFactory
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.event.EventUtils.createMessageBean
@@ -90,20 +89,27 @@ class EventRouter(private val eventBatchRouter: MessageRouter<EventBatch>) {
     /**
      * Creates a parent estore event for the specified connection and method call.
      *
-     * @param request         The [IRequest] for which this parent event should be created.
+     * @param parentEventId The ID of the parent event as an [EventID]
      * @param rpcName         The name of the service method that is being called (Will be a part of the event name).
+     * @param requestName The name of the class of the request.
      * @param status          The initial status of the event as a [Event.Status].
+     * @param description Description of the event as a string.
      * @return The ID of the created event as an [EventID].
      *
      * @throws EventSubmissionException If an error occurs while creating the specified event.
      */
-    fun createParentEvent(request: IRequest, rpcName: String, status: Event.Status): EventID {
+    fun createParentEvent(
+        parentEventId: EventID,
+        rpcName: String,
+        requestName: String,
+        status: Event.Status,
+        description: String): EventID {
         return createEvent(
             status,
             type = rpcName,
-            name = "$rpcName for ${request.requestMessage.metadata.id.connectionId.sessionAlias}",
-            description = request.requestDescription,
-            parentEventID = request.requestMessage.parentEventId
+            name = requestName,
+            description = description,
+            parentEventID = parentEventId
         )
     }
 
@@ -112,17 +118,16 @@ class EventRouter(private val eventBatchRouter: MessageRouter<EventBatch>) {
      *
      * @param message The message to be included in the event.
      * @param parentEventID The ID of the parent event as an [EventID]
-     * @param rpcName  The name of the service method that is being called (Will be a part of the event name).
      * @param description Description of the event as a string.
      *
      * @return The ID of the created event as an [EventID].
      *
      * @throws EventSubmissionException If an error occurs while creating the specified event.
      */
-    fun createSendMessageEvent(message: Message, parentEventID: EventID? = null, rpcName: String, description: String): EventID {
+    fun createSendMessageEvent(message: Message, parentEventID: EventID? = null, description: String): EventID {
         return createEvent(
             Event.Status.PASSED,
-            type = rpcName,
+            type = "Outgoing Message",
             name = "Send ${message.metadata.messageType} message to connectivity",
             body = listOf(message.toTreeTable()),
             parentEventID = parentEventID,
@@ -142,12 +147,12 @@ class EventRouter(private val eventBatchRouter: MessageRouter<EventBatch>) {
      * @throws EventSubmissionException If an error occurs while creating the specified events.
      */
     fun createResponseReceivedEvents(
-        messages: List<Message>, eventStatus: Event.Status, parentEventID: EventID? = null, description: String, rpcName: String
+        messages: List<Message>, eventStatus: Event.Status, parentEventID: EventID? = null, description: String
     ) {
         val events = Array(messages.size) { messages[it] }.map { message ->
             Event.start()
                 .name("Received a ${message.messageType} message")
-                .type(rpcName)
+                .type("Received Message")
                 .status(eventStatus)
                 .bodyData(message.toTreeTable())
                 .messageID(message.metadata.id)

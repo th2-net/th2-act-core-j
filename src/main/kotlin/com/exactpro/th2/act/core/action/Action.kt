@@ -29,6 +29,7 @@ import com.exactpro.th2.act.core.rules.filter.IReceiveBuilder
 import com.exactpro.th2.check1.grpc.Check1Service
 import com.exactpro.th2.check1.grpc.CheckpointRequest
 import com.exactpro.th2.check1.grpc.CheckpointResponse
+import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.grpc.Checkpoint
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.EventID
@@ -135,12 +136,22 @@ class Action<T>(
         observer.onNext(result)
     }
 
-    fun registerCheckPoint(parentEventId: EventID?): Checkpoint {
+    fun registerCheckPoint(parentEventId: EventID?, description: String): Checkpoint {
         LOGGER.debug("Registering the checkpoint started")
 
         val checkpointRequest = CheckpointRequest.newBuilder()
-        if (parentEventId != null)
-            checkpointRequest.parentEventId = parentEventId
+
+        if (parentEventId != null) {
+            val eventID = requestContext.eventBatchRouter.createParentEvent(
+                parentEventId = parentEventId,
+                rpcName = requestContext.rpcName,
+                requestName = requestContext.requestName,
+                status = Event.Status.PASSED,
+                description = description
+            )
+
+            checkpointRequest.parentEventId = eventID
+        }
 
         val response: CheckpointResponse = check1Service.createCheckpoint(checkpointRequest.build())
         LOGGER.debug("Registering the checkpoint ended. Response $response")

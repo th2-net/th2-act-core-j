@@ -36,7 +36,6 @@ class RequestMessageSubmitter: IRequestMessageSubmitter {
             requestContext.eventBatchRouter.createSendMessageEvent(
                 message = request.requestMessage,
                 parentEventID = requestContext.parentEventID,
-                rpcName = requestContext.rpcName,
                 description = request.requestDescription
             )
 

@@ -592,7 +592,7 @@ class TestDSL {
                 get { parentId }.isEqualTo(parentEventID)
                 get { status }.isEqualTo(EventStatus.SUCCESS)
                 get { name }.isEqualTo("Received a $messageType message")
-                get { type }.contains(rpcName)
+                get { type }.contains("Received Message")
             }
         }
     }

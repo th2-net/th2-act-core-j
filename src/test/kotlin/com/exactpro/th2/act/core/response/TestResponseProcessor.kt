@@ -85,7 +85,7 @@ internal class TestResponseProcessor {
         )
 
         val processedMessages = randomMessage()
-        every { eventRouter.createResponseReceivedEvents(any(), any(), any(), any(), any()) } answers { randomString().toEventID() }
+        every { eventRouter.createResponseReceivedEvents(any(), any(), any(), any()) } answers { randomString().toEventID() }
 
         val messageMatches = mutableListOf(MessageMatches(processedMessages, Status.PASSED))
 
@@ -102,7 +102,6 @@ internal class TestResponseProcessor {
                 messages = capture(responseMessagesSlot),
                 eventStatus = Status.PASSED,
                 parentEventID = requestContext.parentEventID,
-                rpcName = requestContext.rpcName,
                 description = description
             )
         }
@@ -187,7 +186,7 @@ internal class TestResponseProcessor {
 
         val receivedMessage = TestMessageType.REJECT.toRandomMessage()
 
-        every { eventRouter.createResponseReceivedEvents(any(), any(), any(), any(), any()) } answers { randomString().toEventID() }
+        every { eventRouter.createResponseReceivedEvents(any(), any(), any(), any()) } answers { randomString().toEventID() }
 
         responseProcessor.process(
             messagesMatches = listOf(MessageMatches(randomMessage(), Status.PASSED)),

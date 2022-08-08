@@ -51,7 +51,6 @@ class ResponseProcessor(
                         messages = messagesMatches.stream().map { msgMatches -> msgMatches.message }.collect(Collectors.toList()),
                         eventStatus = it.status,
                         parentEventID = requestContext.parentEventID,
-                        rpcName = requestContext.rpcName,
                         description = description
                     )
                 }

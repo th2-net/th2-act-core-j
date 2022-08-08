@@ -104,7 +104,15 @@ internal class TestEventRouter {
     fun `test should create parent event`(eventStatus: Status) {
         val request = Request(randomMessage(), randomString())
         val rpcName = randomString()
-        val eventID = eventRouter.createParentEvent(request, rpcName, eventStatus)
+        val requestName = randomString()
+        val description = randomString()
+        val eventID = eventRouter.createParentEvent(
+            request.requestMessage.parentEventId,
+            rpcName,
+            requestName,
+            eventStatus,
+            description
+        )
 
         val expectedStatus = when (eventStatus) {
             Status.PASSED -> EventStatus.SUCCESS
@@ -119,9 +127,7 @@ internal class TestEventRouter {
                 get { status }.isEqualTo(expectedStatus)
                 get { type }.isEqualTo(rpcName)
 
-                get { name }.contains(rpcName)
-                get { name }.contains(request.requestDescription)
-                get { name }.contains(request.requestMessage.metadata.id.connectionId.sessionAlias)
+                get { name }.contains(requestName)
             }
         }
     }
@@ -130,7 +136,7 @@ internal class TestEventRouter {
     fun `test should create send message event`() {
         val message = randomMessage()
         val parentEventID = randomString().toEventID()
-        val eventID = eventRouter.createSendMessageEvent(message, parentEventID, randomString(), randomString())
+        val eventID = eventRouter.createSendMessageEvent(message, parentEventID, randomString())
 
         expect {
             that(eventBatchRouter.sent.eventsCount).isEqualTo(1)
@@ -158,7 +164,6 @@ internal class TestEventRouter {
             messages = messages.toList(),
             eventStatus = eventStatus,
             parentEventID = parentEventID,
-            rpcName = randomString(),
             description = randomString()
         )
 
@@ -256,9 +261,11 @@ internal class TestEventRouter {
             return Stream.of(
                 Arguments.of(Consumer { eventRouter: EventRouter ->
                     eventRouter.createParentEvent(
-                        request = randomRequest(),
+                        parentEventId = randomString().toEventID(),
                         rpcName = randomString(),
-                        status = randomEventStatus()
+                        requestName = randomString(),
+                        status = randomEventStatus(),
+                        description = randomString()
                     )
                 }),
                 Arguments.of(Consumer { eventRouter: EventRouter ->
@@ -271,7 +278,6 @@ internal class TestEventRouter {
                     eventRouter.createSendMessageEvent(
                         message = randomMessage(),
                         parentEventID = randomString().toEventID(),
-                        rpcName = randomString(),
                         description = randomString()
                     )
                 }),
@@ -293,7 +299,6 @@ internal class TestEventRouter {
                         messages = 5.of { randomMessage() }.toList(),
                         eventStatus = Status.values().random(),
                         parentEventID = randomString().toEventID(),
-                        rpcName = randomString(),
                         description = randomString()
                     )
                 })
