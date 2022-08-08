@@ -19,7 +19,6 @@ package com.exactpro.th2.act.core.receivers
 import com.exactpro.th2.act.*
 import com.exactpro.th2.act.core.managers.MessageBatchListener
 import com.exactpro.th2.act.core.managers.SubscriptionManager
-import com.exactpro.th2.act.core.messages.IMessageType
 import com.exactpro.th2.act.core.monitors.IMessageResponseMonitor
 import com.exactpro.th2.act.core.rules.ICheckRule
 import com.exactpro.th2.act.core.rules.ICheckRuleFactory
@@ -116,7 +115,7 @@ internal class TestMultipleMessageReceiver {
 
     @ParameterizedTest
     @EnumSource(TestMessageType::class)
-    fun `test should match message to first rule and notify message response monitor`(messageType: IMessageType) {
+    fun `test should match message to first rule and notify message response monitor`(messageType: TestMessageType) {
         val randomMessages = 5.of { randomMessage() }.plus(5.of { randomMessage(commonConnectionID()) })
         val expectedMessage = messageType.toRandomMessage(commonConnectionID(), direction = Direction.FIRST)
 
@@ -133,7 +132,7 @@ internal class TestMultipleMessageReceiver {
 
     @ParameterizedTest
     @EnumSource(TestMessageType::class)
-    fun `test should not notify message response monitor when first rule is not matched`(messageType: IMessageType) {
+    fun `test should not notify message response monitor when first rule is not matched`(messageType: TestMessageType) {
         val randomMessages = 10.randomMessageTypes()
                 .filter { it != messageType }
                 .map { it.toRandomMessage(commonConnectionID()) }

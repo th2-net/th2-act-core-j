@@ -70,7 +70,7 @@ internal class TestResponseProcessor {
     @Test
     fun `test should create a response processor`() {
         ResponseProcessor(
-            noResponseBodyFactory = NoResponseBodyFactory(listOf(TestMessageType.NEW_ORDER_SINGLE)),
+            noResponseBodyFactory = NoResponseBodyFactory(listOf(TestMessageType.NEW_ORDER_SINGLE.typeName())),
             description = randomString()
         )
     }
@@ -80,7 +80,7 @@ internal class TestResponseProcessor {
     fun `test should submit a response received event`(requestStatus: RequestStatus.Status) {
         val description = randomString()
         val responseProcessor = ResponseProcessor(
-            noResponseBodyFactory = NoResponseBodyFactory(listOf(TestMessageType.NEW_ORDER_SINGLE)),
+            noResponseBodyFactory = NoResponseBodyFactory(listOf(TestMessageType.NEW_ORDER_SINGLE.typeName())),
             description = description
         )
 
@@ -113,7 +113,7 @@ internal class TestResponseProcessor {
 
     @Test
     fun `test should submit a no response received event`() {
-        val noResponseBodyFactory = NoResponseBodyFactory(listOf(TestMessageType.NEW_ORDER_SINGLE))
+        val noResponseBodyFactory = NoResponseBodyFactory(listOf(TestMessageType.NEW_ORDER_SINGLE.typeName()))
 
         val responseProcessor = ResponseProcessor(
             noResponseBodyFactory = noResponseBodyFactory,
@@ -157,7 +157,7 @@ internal class TestResponseProcessor {
        receivedMessages.forEach { messageMatches.add(MessageMatches(it, Status.FAILED)) }
 
         val responseProcessor = ResponseProcessor(
-            noResponseBodyFactory = NoResponseBodyFactory(listOf(TestMessageType.NEW_ORDER_SINGLE)),
+            noResponseBodyFactory = NoResponseBodyFactory(listOf(TestMessageType.NEW_ORDER_SINGLE.typeName())),
             description = randomString()
         )
 
@@ -180,7 +180,7 @@ internal class TestResponseProcessor {
     @Test
     fun `test should not send response to client`() {
         val responseProcessor = ResponseProcessor(
-            noResponseBodyFactory = NoResponseBodyFactory(listOf(TestMessageType.NEW_ORDER_SINGLE)),
+            noResponseBodyFactory = NoResponseBodyFactory(listOf(TestMessageType.NEW_ORDER_SINGLE.typeName())),
             description = randomString()
         )
 

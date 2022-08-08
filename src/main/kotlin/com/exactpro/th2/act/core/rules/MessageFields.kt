@@ -17,13 +17,12 @@
 package com.exactpro.th2.act.core.rules
 
 import com.exactpro.th2.act.core.messages.IField
-import com.exactpro.th2.act.core.messages.IMessageType
 import com.exactpro.th2.common.grpc.MessageOrBuilder
 import mu.KotlinLogging
 
 private val LOGGER = KotlinLogging.logger {}
 
-class MessageFields(val messageType: IMessageType, private val expectedValues: Map<IField, String>) {
+class MessageFields(val messageType: String, private val expectedValues: Map<IField, String>) {
 
     /**
      * Checks whether the specified message matches this [MessageFields].
@@ -33,7 +32,7 @@ class MessageFields(val messageType: IMessageType, private val expectedValues: M
      */
     fun match(message: MessageOrBuilder): Boolean {
 
-        if (message.metadata.messageType != messageType.typeName) {
+        if (message.metadata.messageType != messageType) {
             return false
         }
 

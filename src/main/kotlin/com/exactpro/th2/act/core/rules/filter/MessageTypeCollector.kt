@@ -15,13 +15,12 @@
  */
 package com.exactpro.th2.act.core.rules.filter
 
-import com.exactpro.th2.act.core.messages.IMessageType
 import com.exactpro.th2.common.grpc.Message
 
 class MessageTypeCollector: IReceiveBuilder {
-    private val msgTypes = mutableSetOf<IMessageType>()
+    private val msgTypes = mutableSetOf<String>()
 
-    val messageTypes: List<IMessageType>
+    val messageTypes: List<String>
         get() = msgTypes.toList()
 
     override fun passOn(msgType: String, filter: Message.() -> Boolean): MessageTypeCollector =
@@ -31,7 +30,7 @@ class MessageTypeCollector: IReceiveBuilder {
         addMessageType(msgType)
 
     private fun addMessageType(msgType: String): MessageTypeCollector {
-        msgTypes.add(IMessageType { msgType })
+        msgTypes.add(msgType)
         return this@MessageTypeCollector
     }
 }

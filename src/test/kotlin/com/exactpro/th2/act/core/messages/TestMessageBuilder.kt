@@ -68,10 +68,10 @@ internal class TestMessageBuilder {
 
     @ParameterizedTest
     @EnumSource(TestMessageType::class)
-    fun `test should add correct message type to the message metadata`(messageType: IMessageType) {
+    fun `test should add correct message type to the message metadata`(messageType: TestMessageType) {
         val messageFromType = MessageBuilder create {
             metadata {
-                this.messageType = messageType.typeName
+                this.messageType = messageType.typeName()
             }
             body {
                 repeat(10) {
@@ -82,7 +82,7 @@ internal class TestMessageBuilder {
 
         val messageFromString = MessageBuilder create {
             metadata {
-                this.messageType = messageType.typeName
+                this.messageType = messageType.typeName()
             }
             body {
                 repeat(10) {
@@ -92,7 +92,7 @@ internal class TestMessageBuilder {
         }
 
         expect {
-            that(messageFromType.messageType).isEqualTo(messageFromString.messageType).isEqualTo(messageType.typeName)
+            that(messageFromType.messageType).isEqualTo(messageFromString.messageType).isEqualTo(messageType.typeName())
         }
     }
 

@@ -186,7 +186,7 @@ internal class TestEventRouter {
         val parentEventID = randomString().toEventID()
 
         val eventID = eventRouter.createNoResponseEvent(
-            noResponseBodyFactory = NoResponseBodyFactory(listOf(randomMessageType())),
+            noResponseBodyFactory = NoResponseBodyFactory(listOf(randomMessageType().typeName())),
             processedMessageIDs = messageIDs,
             parentEventID = parentEventID
         )
@@ -205,7 +205,7 @@ internal class TestEventRouter {
 
     @Test
     fun `test should create a no mapping event`() {
-        val messages = 5.randomMessageTypes(TestMessageType.REJECT).map { it.toRandomMessage() }
+        val messages = 5.randomMessageTypes(TestMessageType.REJECT.typeName()).map { it.toRandomMessage() }
         val parentEventID = randomString().toEventID()
 
         val messagesMatches = mutableListOf<MessageMatches>()

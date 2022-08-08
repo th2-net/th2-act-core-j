@@ -25,10 +25,10 @@ typealias MessageFieldMap = Map<*, *>
 typealias RepeatingGroup = Iterable<*>
 
 /**
- * Creates a [Message] object from this [MessageFieldMap]. The [IMessageType] to be added to the metadata can be
+ * Creates a [Message] object from this [MessageFieldMap]. The [String] to be added to the metadata can be
  * optionally specified.
  */
-fun MessageFieldMap.toMessage(messageType: IMessageType? = null): Message {
+fun MessageFieldMap.toMessage(messageType: String? = null): Message {
 
     val wrappedFields = this.entries.associate { fieldEntry ->
 
@@ -70,7 +70,7 @@ fun MessageFieldMap.toMessage(messageType: IMessageType? = null): Message {
     val builder = Message.newBuilder().putAllFields(wrappedFields)
 
     if (messageType != null) {
-        builder.metadata = MessageMetadata.newBuilder().setMessageType(messageType.typeName).build()
+        builder.metadata = MessageMetadata.newBuilder().setMessageType(messageType).build()
     }
 
     return builder.build()

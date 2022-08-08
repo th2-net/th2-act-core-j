@@ -19,7 +19,6 @@ package com.exactpro.th2.act.core.rules
 import com.exactpro.th2.act.TestField
 import com.exactpro.th2.act.TestMessageType
 import com.exactpro.th2.act.core.messages.IField
-import com.exactpro.th2.act.core.messages.IMessageType
 import com.exactpro.th2.act.randomMessageTypes
 import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.grpc.MessageMetadata
@@ -47,34 +46,34 @@ internal class TestMessageFields {
      * 6) Should not match messages with nested field values different from the ones expected. ? No requirement
      */
 
-    fun IMessageType.withFields(fields: Map<IField, String>): Message {
+    fun TestMessageType.withFields(fields: Map<IField, String>): Message {
         return this.withFields(*fields.entries.map { it.key to it.value }.toTypedArray())
     }
 
-    fun IMessageType.withFields(vararg field: Pair<IField, String>): Message = Message
+    fun TestMessageType.withFields(vararg field: Pair<IField, String>): Message = Message
             .newBuilder()
-            .setMetadata(MessageMetadata.newBuilder().setMessageType(this.typeName))
+            .setMetadata(MessageMetadata.newBuilder().setMessageType(this.typeName()))
             .putAllFields(field.associate { entry -> entry.first.fieldName to entry.second.toValue() })
             .build()
 
     @ParameterizedTest
     @EnumSource(TestMessageType::class)
-    fun `test should return correct message type`(messageType: IMessageType) {
-        val messageFields = MessageFields(messageType, mapOf())
+    fun `test should return correct message type`(messageType: TestMessageType) {
+        val messageFields = MessageFields(messageType.typeName(), mapOf())
 
         expect {
-            that(messageFields.messageType).isEqualTo(messageType)
+            that(messageFields.messageType).isEqualTo(messageType.typeName())
         }
     }
 
     @ParameterizedTest
     @EnumSource(TestMessageType::class)
-    fun `test should match message with matching type and exact field values`(messageType: IMessageType) {
+    fun `test should match message with matching type and exact field values`(messageType: TestMessageType) {
         val fieldMap: Map<IField, String> = mapOf(
             TestField.CLIENT_ORDER_ID to "Test ID", TestField.ORDER_TYPE to "Test Order Type"
         )
 
-        val messageFields = MessageFields(messageType, fieldMap)
+        val messageFields = MessageFields(messageType.typeName(), fieldMap)
 
         expect {
             that(messageFields.match(messageType.withFields(fieldMap))).isTrue()
@@ -83,13 +82,13 @@ internal class TestMessageFields {
 
     @ParameterizedTest
     @EnumSource(TestMessageType::class)
-    fun `test should match message with matching type and extra field values`(messageType: IMessageType) {
+    fun `test should match message with matching type and extra field values`(messageType: TestMessageType) {
         val fieldMap: Map<IField, String> = mapOf(
             TestField.CLIENT_ORDER_ID to "Test ID",
             TestField.ORDER_TYPE to "Test Order Type"
         )
 
-        val messageFields = MessageFields(messageType, fieldMap)
+        val messageFields = MessageFields(messageType.typeName(), fieldMap)
 
         val message = messageType.withFields(
             fieldMap.plus(
@@ -107,8 +106,8 @@ internal class TestMessageFields {
 
     @ParameterizedTest
     @MethodSource("provideDistinctMessageTypes")
-    fun `test should not match message with different type`(firstType: IMessageType, secondType: IMessageType) {
-        val messageFields = MessageFields(firstType, mapOf())
+    fun `test should not match message with different type`(firstType: TestMessageType, secondType: TestMessageType) {
+        val messageFields = MessageFields(firstType.typeName(), mapOf())
 
         require(firstType != secondType)
 
@@ -119,13 +118,13 @@ internal class TestMessageFields {
 
     @ParameterizedTest
     @EnumSource(TestMessageType::class)
-    fun `test should match message with different field values`(messageType: IMessageType) {
+    fun `test should match message with different field values`(messageType: TestMessageType) {
         val fieldMap: Map<IField, String> = mapOf(
             TestField.CLIENT_ORDER_ID to "Test ID",
             TestField.ORDER_TYPE to "Test Order Type"
         )
 
-        val messageFields = MessageFields(messageType, fieldMap)
+        val messageFields = MessageFields(messageType.typeName(), fieldMap)
 
         val message = messageType.withFields(
             TestField.CLIENT_ORDER_ID to "Wrong Test ID",
@@ -139,13 +138,13 @@ internal class TestMessageFields {
 
     @ParameterizedTest
     @EnumSource(TestMessageType::class)
-    fun `test should match message with missing fields`(messageType: IMessageType) {
+    fun `test should match message with missing fields`(messageType: TestMessageType) {
         val fieldMap: Map<IField, String> = mapOf(
             TestField.CLIENT_ORDER_ID to "Test ID",
             TestField.ORDER_TYPE to "Test Order Type"
         )
 
-        val messageFields = MessageFields(messageType, fieldMap)
+        val messageFields = MessageFields(messageType.typeName(), fieldMap)
 
         val message = messageType.withFields(
             TestField.BENCHMARK_SECURITY_ID to "Not important", // No Client Order ID

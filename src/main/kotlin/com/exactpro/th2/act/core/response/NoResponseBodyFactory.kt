@@ -16,11 +16,10 @@
 
 package com.exactpro.th2.act.core.response
 
-import com.exactpro.th2.act.core.messages.IMessageType
 import com.exactpro.th2.common.event.EventUtils
 import com.exactpro.th2.common.event.IBodyData
 
-class NoResponseBodyFactory(private val requestMessageType: List<IMessageType>): IBodyDataFactory {
+class NoResponseBodyFactory(private val requestMessageType: List<String>): IBodyDataFactory {
 
     override fun createBodyData(): MutableCollection<IBodyData> {
         return mutableListOf(EventUtils.createMessageBean("No responses found for $requestMessageType"))

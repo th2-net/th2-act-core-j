@@ -15,7 +15,6 @@
  */
 package com.exactpro.th2.act.core.rules
 
-import com.exactpro.th2.act.core.messages.IMessageType
 import com.exactpro.th2.common.grpc.ConnectionID
 import com.exactpro.th2.common.grpc.Message
 import com.google.protobuf.TextFormat
@@ -37,7 +36,7 @@ class MessageFieldsCheckRule(
             )
         }
 
-        typeToMessageFields = messageFields.associateBy { fieldRule -> fieldRule.messageType.typeName }
+        typeToMessageFields = messageFields.associateBy { fieldRule -> fieldRule.messageType }
     }
 
     override fun checkMessageFromConnection(message: Message): Boolean {
@@ -64,9 +63,9 @@ class MessageFieldsCheckRule(
     }
 
     /**
-     * Returns `true` if the specified list of [IMessageType]s contains a duplicate.
+     * Returns `true` if the specified list of [String]s contains a duplicate.
      */
-    private fun hasDuplicates(values: List<IMessageType>): Boolean = values.size != values.toSet().size
+    private fun hasDuplicates(values: List<String>): Boolean = values.size != values.toSet().size
 
     constructor(requestConnId: ConnectionID, vararg messageFields: MessageFields):
             this(requestConnId, messageFields.asList())

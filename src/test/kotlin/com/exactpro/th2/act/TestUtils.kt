@@ -17,7 +17,6 @@
 package com.exactpro.th2.act
 
 import com.exactpro.th2.act.core.messages.IField
-import com.exactpro.th2.act.core.messages.IMessageType
 import com.exactpro.th2.act.core.requests.IRequest
 import com.exactpro.th2.act.core.requests.Request
 import com.exactpro.th2.act.core.rules.MessageFields
@@ -27,7 +26,7 @@ import com.exactpro.th2.common.grpc.*
 import com.exactpro.th2.common.value.toValue
 import org.apache.commons.lang3.RandomStringUtils
 
-enum class TestMessageType(private val typeName: String) : IMessageType {
+enum class TestMessageType(private val typeName: String) {
 
     NEW_ORDER_SINGLE("NewOrderSingle"),
     ORDER_CANCEL_REPLACE_REQUEST("OrderCancelReplaceRequest"),
@@ -39,7 +38,7 @@ enum class TestMessageType(private val typeName: String) : IMessageType {
     TRADE_CAPTURE_REPORT("TradeCaptureReport"),
     TRADE_CAPTURE_REPORT_ACK("TradeCaptureReportAck");
 
-    override fun getTypeName() = typeName
+    fun typeName() = typeName
 }
 
 enum class TestField(private val fieldName: String) : IField {
@@ -97,14 +96,14 @@ fun Int.randomFields(valueLength: Int = 10): Array<Pair<IField, String>> = Array
 }
 
 /**
- * Creates an [Array] of random [IMessageType]s of this maximum amount. Values to be excluded can optionally be
+ * Creates an [Array] of random [String]s of this maximum amount. Values to be excluded can optionally be
  * specified.
  */
-fun Int.randomMessageTypes(vararg exclude: IMessageType): Array<IMessageType> = Array(this) {
-    var messageType: IMessageType
+fun Int.randomMessageTypes(vararg exclude: String): Array<TestMessageType> = Array(this) {
+    var messageType: TestMessageType
     do {
         messageType = randomMessageType()
-    } while (exclude.contains(messageType))
+    } while (exclude.contains(messageType.typeName()))
 
     messageType
 }
@@ -122,19 +121,19 @@ fun String.toConnectionID(): ConnectionID = ConnectionID.newBuilder().setSession
 /**
  * Creates a [MessageFields] object with the specified message type and fields.
  */
-fun IMessageType.toMessageFields(vararg field: Pair<IField, String>): MessageFields =
-    MessageFields(this, field.associate { it })
+fun TestMessageType.toMessageFields(vararg field: Pair<IField, String>): MessageFields =
+    MessageFields(this.typeName(), field.associate { it })
 
 /**
  * Creates a random [MessageFields] object with the specified message type.
  */
-fun IMessageType.toRandomMessageFields(fieldCount: Int = 10, valueLength: Int = 10): MessageFields =
-    MessageFields(this, fieldCount.randomFields(valueLength).associate { it })
+fun TestMessageType.toRandomMessageFields(fieldCount: Int = 10, valueLength: Int = 10): MessageFields =
+    MessageFields(this.typeName(), fieldCount.randomFields(valueLength).associate { it })
 
 /**
  * Creates a [Message] object with the receiver message type and the specified connection ID and fields.
  */
-fun IMessageType.toMessage(
+fun TestMessageType.toMessage(
     connectionID: ConnectionID,
     vararg field: Pair<IField, Any>,
     direction: Direction = Direction.FIRST,
@@ -144,14 +143,14 @@ fun IMessageType.toMessage(
 /**
  * Creates a [Message] object with the receiver message type and the specified connection ID and fields.
  */
-fun IMessageType.toMessage(
+fun TestMessageType.toMessage(
     connectionID: ConnectionID,
     fields: Map<IField, Any>,
     direction: Direction = Direction.FIRST,
     parentEventID: EventID? = null
 ): Message {
     val metadata = MessageMetadata.newBuilder()
-        .setMessageType(this.typeName)
+        .setMessageType(this.typeName())
         .setId(MessageID.newBuilder().setConnectionId(connectionID).setDirection(direction))
 
     return Message.newBuilder()
@@ -165,7 +164,7 @@ fun IMessageType.toMessage(
 /**
  * Creates a [Message] object of this message type, the specified connection ID and **random** fields.
  */
-fun IMessageType.toRandomMessage(
+fun TestMessageType.toRandomMessage(
     connectionID: ConnectionID = randomConnectionID(),
     fieldCount: Int = 10,
     direction: Direction? = null,
@@ -223,9 +222,9 @@ fun randomConnectionID(): ConnectionID {
 }
 
 /**
- * Returns a random [IMessageType].
+ * Returns a random [String].
  */
-fun randomMessageType(): IMessageType = TestMessageType.values().random()
+fun randomMessageType(): TestMessageType = TestMessageType.values().random()
 
 /**
  * Returns a random [Message]. The direction of the message can optionally be specified.

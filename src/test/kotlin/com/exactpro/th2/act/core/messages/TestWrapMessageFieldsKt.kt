@@ -67,11 +67,11 @@ internal class TestWrapMessageFieldsKt {
 
     @ParameterizedTest
     @EnumSource(TestMessageType::class)
-    fun `test should add correct message type to the message metadata`(messageType: IMessageType) {
+    fun `test should add correct message type to the message metadata`(messageType: TestMessageType) {
         val fields = 10.randomFields().toMap()
 
         expect {
-            that(fields.toMessage(messageType).messageType).isEqualTo(messageType.typeName)
+            that(fields.toMessage(messageType.typeName()).messageType).isEqualTo(messageType.typeName())
         }
     }
 
