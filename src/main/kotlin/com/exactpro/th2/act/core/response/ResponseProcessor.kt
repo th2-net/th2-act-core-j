@@ -20,7 +20,6 @@ import com.exactpro.th2.act.core.messages.MessageMatches
 import com.exactpro.th2.act.core.action.NoResponseFoundException
 import com.exactpro.th2.act.core.requests.RequestContext
 import com.exactpro.th2.common.grpc.MessageID
-import java.util.stream.Collectors
 
 class ResponseProcessor(
     private val noResponseBodyFactory: IBodyDataFactory,
@@ -42,13 +41,15 @@ class ResponseProcessor(
         } else {
             messagesMatches.forEach {
                 if (it.isMatchesFail()) {
-                    requestContext.eventBatchRouter.createErrorEvent(
-                        description = "Found a message for failOn.",
-                        parentEventID = requestContext.parentEventID
+                    requestContext.eventBatchRouter.createResponseReceivedEventFailOn(
+                        message = it.message,
+                        eventStatus = it.status,
+                        parentEventID = requestContext.parentEventID,
+                        description = "Found a message for failOn."
                     )
                 } else {
-                    requestContext.eventBatchRouter.createResponseReceivedEvents(
-                        messages = messagesMatches.stream().map { msgMatches -> msgMatches.message }.collect(Collectors.toList()),
+                    requestContext.eventBatchRouter.createResponseReceivedEvent(
+                        message = it.message,
                         eventStatus = it.status,
                         parentEventID = requestContext.parentEventID,
                         description = description

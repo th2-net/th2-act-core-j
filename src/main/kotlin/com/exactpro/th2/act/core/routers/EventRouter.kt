@@ -136,6 +136,64 @@ class EventRouter(private val eventBatchRouter: MessageRouter<EventBatch>) {
     }
 
     /**
+     * Creates response received events from the specified message. The parent event for these events can
+     * optionally be specified.
+     *
+     * @param message The of received [Message] to be included in the event.
+     * @param eventStatus The status to be set for the response received events.
+     * @param parentEventID The ID of the parent event as an [EventID]
+     * @param description Description of the event as a string.
+     *
+     * @throws EventSubmissionException If an error occurs while creating the specified events.
+     */
+    fun createResponseReceivedEventFailOn(
+        message: Message, eventStatus: Event.Status, parentEventID: EventID? = null, description: String
+    ) {
+        val events = Event.start()
+            .name("Received a ${message.messageType} message for failOn")
+            .type("Received Message FailOn")
+            .status(eventStatus)
+            .bodyData(message.toTreeTable())
+            .messageID(message.metadata.id)
+            .description(description)
+
+        try {
+            storeEvent(events, parentEventID)
+        } catch (e: IOException) {
+            throw EventSubmissionException("Can not store events $events", e)
+        }
+    }
+
+    /**
+     * Creates response received events from the specified message. The parent event for these events can
+     * optionally be specified.
+     *
+     * @param message The of received [Message] to be included in the event.
+     * @param eventStatus The status to be set for the response received events.
+     * @param parentEventID The ID of the parent event as an [EventID]
+     * @param description Description of the event as a string.
+     *
+     * @throws EventSubmissionException If an error occurs while creating the specified events.
+     */
+    fun createResponseReceivedEvent(
+        message: Message, eventStatus: Event.Status, parentEventID: EventID? = null, description: String
+    ) {
+        val events = Event.start()
+                .name("Received a ${message.messageType} message")
+                .type("Received Message")
+                .status(eventStatus)
+                .bodyData(message.toTreeTable())
+                .messageID(message.metadata.id)
+                .description(description)
+
+        try {
+            storeEvent(events, parentEventID)
+        } catch (e: IOException) {
+            throw EventSubmissionException("Can not store events $events", e)
+        }
+    }
+
+    /**
      * Creates response received events from the specified message list. The parent event for these events can
      * optionally be specified.
      *

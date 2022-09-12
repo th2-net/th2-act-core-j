@@ -423,6 +423,42 @@ class TestDSL {
     }
 
     @Test
+    fun `testing reject`(){
+        val messages = listOf(
+            messageBuild("NewOrderSingle", "sessionAlias", Direction.FIRST, 1L),
+            messageBuild("NewOrderSingle", "sessionAlias", Direction.SECOND, 2L),
+            messageBuild("Reject", "sessionAlias", Direction.FIRST, 2L),
+        )
+
+        actionFactory.apply {
+            createAction(observer, rpcName, randomString(), parentEventID, 10000)
+                .preFilter { msg -> msg.sessionAlias == "sessionAlias" && (msg.direction == Direction.FIRST
+                        || msg.direction == Direction.SECOND) }
+                .execute {
+                    messages.forEach { subscriptionManager.handler(randomString(), it.toBatch()) }
+
+                    val echoMessage: Message = send(messages[0], "sessionAlias", 1000, true, cleanBuffer = false)
+                    assertEquals(messages[1], echoMessage)
+
+                    receive(1000, "sessionAlias", Direction.FIRST) {
+                        passOn("NewOrderSingle") { this.sequence == 3L }
+                        failOn("NewOrderSingle") { this.sequence == 4L }
+                        failOn("Reject") { this.sequence == echoMessage.sequence }
+                    }
+                }
+        }
+        expect {
+            that(eventBatchRouter.sent.eventsList).any {
+                get { parentId }.isEqualTo(parentEventID)
+                get { status }.isEqualTo(EventStatus.FAILED)
+                get { type }.isEqualTo("Received Message FailOn")
+                get { name }.contains("Received a Reject message for failOn")
+                get { name }.contains("Found a message for failOn.")
+            }
+        }
+    }
+
+    @Test
     fun `receiving messages from two directions`() {
         val messages = mutableListOf<Message>()
         messages.add(messageBuild("NewOrderSingle", "sessionAlias", Direction.FIRST, 1L))
@@ -559,8 +595,8 @@ class TestDSL {
             that(eventBatchRouter.sent.eventsList).any {
                 get { parentId }.isEqualTo(parentEventID)
                 get { status }.isEqualTo(EventStatus.FAILED)
-                get { type }.isEqualTo("Error")
-                get { name }.contains("An Error has occurred")
+                get { type }.isEqualTo("Received Message FailOn")
+                get { name }.contains("Received a NewOrderSingle message for failOn")
                 get { name }.contains("Found a message for failOn.")
             }
         }

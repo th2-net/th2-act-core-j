@@ -25,6 +25,7 @@ import com.exactpro.th2.act.core.routers.EventRouter
 import com.exactpro.th2.common.event.Event.Status
 import com.exactpro.th2.common.grpc.*
 import io.mockk.*
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -85,7 +86,7 @@ internal class TestResponseProcessor {
         )
 
         val processedMessages = randomMessage()
-        every { eventRouter.createResponseReceivedEvents(any(), any(), any(), any()) } answers { randomString().toEventID() }
+        every { eventRouter.createResponseReceivedEvent(any(), any(), any(), any()) } answers { randomString().toEventID() }
 
         val messageMatches = mutableListOf(MessageMatches(processedMessages, Status.PASSED))
 
@@ -95,11 +96,11 @@ internal class TestResponseProcessor {
             requestContext = requestContext
         )
 
-        val responseMessagesSlot = slot<List<Message>>()
+        val responseMessagesSlot = slot<Message>()
 
         verify {
-            eventRouter.createResponseReceivedEvents(
-                messages = capture(responseMessagesSlot),
+            eventRouter.createResponseReceivedEvent(
+                message = capture(responseMessagesSlot),
                 eventStatus = Status.PASSED,
                 parentEventID = requestContext.parentEventID,
                 description = description
@@ -107,7 +108,7 @@ internal class TestResponseProcessor {
         }
 
         expect {
-            that(responseMessagesSlot.captured).containsExactly(processedMessages)
+            assertEquals(responseMessagesSlot.captured, processedMessages)
         }
     }
 
@@ -161,7 +162,7 @@ internal class TestResponseProcessor {
             description = randomString()
         )
 
-        every { eventRouter.createErrorEvent(any(), any()) } answers { randomString().toEventID() }
+        every { eventRouter.createResponseReceivedEventFailOn(any(), any(), any(), any()) } answers { randomString().toEventID() }
 
         responseProcessor.process(
             messagesMatches = messageMatches,
@@ -170,10 +171,14 @@ internal class TestResponseProcessor {
         )
 
         verify {
-            eventRouter.createErrorEvent(
-                description = "Found a message for failOn.",
-                parentEventID = requestContext.parentEventID
-            )
+            messageMatches.forEach {
+                eventRouter.createResponseReceivedEventFailOn(
+                    message = it.message,
+                    eventStatus = it.status,
+                    parentEventID = requestContext.parentEventID,
+                    description = "Found a message for failOn."
+                )
+            }
         }
     }
 
@@ -186,7 +191,7 @@ internal class TestResponseProcessor {
 
         val receivedMessage = TestMessageType.REJECT.toRandomMessage()
 
-        every { eventRouter.createResponseReceivedEvents(any(), any(), any(), any()) } answers { randomString().toEventID() }
+        every { eventRouter.createResponseReceivedEvent(any(), any(), any(), any()) } answers { randomString().toEventID() }
 
         responseProcessor.process(
             messagesMatches = listOf(MessageMatches(randomMessage(), Status.PASSED)),
