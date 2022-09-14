@@ -71,6 +71,12 @@ class MessageBuilderRefactor(type: String) {
         builder.metadataBuilder.messageType = type
     }
 
+    var parentEventId: EventID
+        get() = builder.parentEventId
+        set(value) {
+            builder.parentEventId = value
+        }
+
     val metadata: MessageMetadataBuilderRefactor = MessageMetadataBuilderRefactor(builder.metadataBuilder)
 
     val body: MessageBodyBuilderRefactor = MessageBodyBuilderRefactor(builder)
@@ -90,7 +96,6 @@ class MessageBuilderRefactor(type: String) {
 class MessageMetadataBuilderRefactor(
     private val metadataBuilder: MessageMetadata.Builder
 ) {
-
     var protocol: String
         get() = metadataBuilder.protocol
         set(value) {
