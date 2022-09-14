@@ -181,6 +181,8 @@ class MessageBodyBuilderRefactor(
     infix fun String.buildList(action: ListValueBuilderRefactor.() -> Unit) {
         this to ListValueBuilderRefactor().apply(action)
     }
+
+    fun build(): Message = messageBuilder.build()
 }
 
 
