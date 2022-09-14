@@ -16,10 +16,7 @@
 
 package com.exactpro.th2.act.core.messages
 
-import com.exactpro.th2.common.grpc.ListValue
-import com.exactpro.th2.common.grpc.Message
-import com.exactpro.th2.common.grpc.MessageMetadata
-import com.exactpro.th2.common.grpc.Value
+import com.exactpro.th2.common.grpc.*
 import com.exactpro.th2.common.value.nullValue
 import com.exactpro.th2.common.value.toValue
 
@@ -103,8 +100,42 @@ class MessageMetadataBuilderRefactor(
     fun addProperty(name: String, value: String) {
         metadataBuilder.putProperties(name, value)
     }
+
+    fun id (messageBlock: MessageIDBuilderRefactor.() -> Unit) {
+        metadataBuilder.id = MessageIDBuilderRefactor().also(messageBlock).build()
+    }
 }
 
+@BuilderMarker
+class MessageIDBuilderRefactor{
+    private val messageIDBuilder: MessageID.Builder = MessageID.newBuilder()
+
+    var direction: Direction
+        get() = messageIDBuilder.direction
+        set(value) {
+            messageIDBuilder.direction = value
+        }
+
+    var sessionAlias: String
+        get() = messageIDBuilder.connectionId.sessionAlias
+        set(value) {
+            connectionId = ConnectionID.newBuilder().setSessionAlias(value).build()
+        }
+
+    var connectionId: ConnectionID
+        get() = messageIDBuilder.connectionId
+        set(value) {
+            messageIDBuilder.connectionId = value
+        }
+
+    var sequence: Long
+        get() = messageIDBuilder.sequence
+        set(value) {
+            messageIDBuilder.sequence = value
+        }
+
+    fun build(): MessageID = messageIDBuilder.build()
+}
 
 @MessageBuilderMarker
 class MessageBodyBuilderRefactor(
