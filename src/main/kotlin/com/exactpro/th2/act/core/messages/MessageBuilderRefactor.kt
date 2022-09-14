@@ -24,7 +24,8 @@ import com.exactpro.th2.common.value.toValue
 annotation class MessageBuilderMarker
 
 fun main() {
-    message("MessageType") {
+    val connectionID = ConnectionID.getDefaultInstance()
+    message("MessageType", connectionID) {
         metadata {
             protocol = "fix"
             addProperty("name", "value")
@@ -34,7 +35,7 @@ fun main() {
             "complex" to message {
                 "field" to 1
             }
-            "collection" to list[1,2,3,4]
+            "collection" to list[1, 2, 3, 4]
             "complexCollection" to list[
                     message {
                         "field" to 'a'
@@ -61,14 +62,17 @@ fun main() {
     }
 }
 
-fun message(type: String, setup: MessageBuilderRefactor.() -> Unit): Message = MessageBuilderRefactor(type).also(setup).build()
+fun message(type: String, connectionID: ConnectionID, setup: MessageBuilderRefactor.() -> Unit): Message =
+    MessageBuilderRefactor(type, connectionID).also(setup).build()
 
 
 @MessageBuilderMarker
-class MessageBuilderRefactor(type: String) {
+class MessageBuilderRefactor(type: String, connectionID: ConnectionID) {
     private val builder: Message.Builder = Message.newBuilder()
+
     init {
         builder.metadataBuilder.messageType = type
+        builder.metadataBuilder.setId(MessageID.newBuilder().setConnectionId(connectionID))
     }
 
     var parentEventId: EventID
@@ -83,7 +87,8 @@ class MessageBuilderRefactor(type: String) {
 
     operator fun MessageMetadataBuilderRefactor.invoke(action: MessageMetadataBuilderRefactor.() -> Unit) = action()
 
-    operator fun MessageBodyBuilderRefactor.invoke(action: MessageBodyBuilderRefactor.() -> Unit): MessageBodyBuilderRefactor = apply(action)
+    operator fun MessageBodyBuilderRefactor.invoke(action: MessageBodyBuilderRefactor.() -> Unit): MessageBodyBuilderRefactor =
+        apply(action)
 
     /**
      * Builds a [Message] according to the current state of this builder.
@@ -105,48 +110,14 @@ class MessageMetadataBuilderRefactor(
     fun addProperty(name: String, value: String) {
         metadataBuilder.putProperties(name, value)
     }
-
-    fun id (messageBlock: MessageIDBuilderRefactor.() -> Unit) {
-        metadataBuilder.id = MessageIDBuilderRefactor().also(messageBlock).build()
-    }
-}
-
-@BuilderMarker
-class MessageIDBuilderRefactor{
-    private val messageIDBuilder: MessageID.Builder = MessageID.newBuilder()
-
-    var direction: Direction
-        get() = messageIDBuilder.direction
-        set(value) {
-            messageIDBuilder.direction = value
-        }
-
-    var sessionAlias: String
-        get() = messageIDBuilder.connectionId.sessionAlias
-        set(value) {
-            connectionId = ConnectionID.newBuilder().setSessionAlias(value).build()
-        }
-
-    var connectionId: ConnectionID
-        get() = messageIDBuilder.connectionId
-        set(value) {
-            messageIDBuilder.connectionId = value
-        }
-
-    var sequence: Long
-        get() = messageIDBuilder.sequence
-        set(value) {
-            messageIDBuilder.sequence = value
-        }
-
-    fun build(): MessageID = messageIDBuilder.build()
 }
 
 @MessageBuilderMarker
 class MessageBodyBuilderRefactor(
     internal val messageBuilder: Message.Builder = Message.newBuilder(),
 ) {
-    fun message(action: MessageBodyBuilderRefactor.() -> Unit): MessageBodyBuilderRefactor = MessageBodyBuilderRefactor(Message.newBuilder()).apply(action)
+    fun message(action: MessageBodyBuilderRefactor.() -> Unit): MessageBodyBuilderRefactor =
+        MessageBodyBuilderRefactor(Message.newBuilder()).apply(action)
 
     val list: ListValueFactory = ListValueFactory
 
