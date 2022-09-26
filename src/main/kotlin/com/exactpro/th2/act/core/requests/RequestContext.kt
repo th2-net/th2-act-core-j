@@ -41,31 +41,13 @@ data class RequestContext(
     val requestName: String,
     val messageBatchRouter: MessageRouter,
     val eventBatchRouter: EventRouter,
-    var parentEventID: EventID,
+    val parentEventID: EventID,
     val checkpoint: Checkpoint,
     val subscriptionManager: ISubscriptionManager,
     val timeout: Long,
     private val rpcContext: Context = Context.current()
 ) {
     private val startTime = System.currentTimeMillis()
-
-    /**
-     * Returns the deadline for the underlying rpc Context or `null` if none is set.
-     */
-    val requestDeadline: Deadline?
-        get() = rpcContext.deadline
-
-    /**
-     * Returns `true` if the associated rpc is cancelled, `false` otherwise.
-     */
-    val isCancelled: Boolean
-        get() = rpcContext.isCancelled
-
-    /**
-     * Returns the cancellation cause for the rpc if it is cancelled.
-     */
-    val cancellationCause: Throwable?
-        get() = rpcContext.cancellationCause()
 
     /**
      * Returns the remaining time.

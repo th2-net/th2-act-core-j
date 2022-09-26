@@ -20,6 +20,7 @@ import com.exactpro.th2.act.TestField
 import com.exactpro.th2.act.TestMessageType
 import com.exactpro.th2.act.randomField
 import com.exactpro.th2.act.randomString
+import com.exactpro.th2.common.grpc.ConnectionID
 import com.exactpro.th2.common.grpc.ListValue
 import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.grpc.MessageMetadata
@@ -30,6 +31,8 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.EnumSource
 import strikt.api.expect
+import strikt.assertions.containsExactly
+import strikt.assertions.getValue
 import strikt.assertions.isEqualTo
 
 internal class TestMessageBuilder {
@@ -45,311 +48,115 @@ internal class TestMessageBuilder {
 
     @Test
     fun `test should wrap a flat map of fields`() {
-        val message = MessageBuilder create {
+        val message = message("test", ConnectionID.getDefaultInstance()) {
             body {
-                TestField.ORDER_QTY toValue 23000
-                TestField.PRICE toValue 122.123
-                "ClOrdID" toValue "Some ID"
+                TestField.ORDER_QTY.fieldName to 23000
+                TestField.PRICE.fieldName to 122.123
+                "ClOrdID" to "Some ID"
             }
         }
 
         expect {
-            that(message).isEqualTo(
-                Message.newBuilder().putAllFields(
-                    mapOf(
-                        TestField.ORDER_QTY.fieldName to 23000.toValue(),
-                        TestField.PRICE.fieldName to 122.123.toValue(),
-                        "ClOrdID" to "Some ID".toValue()
-                    )
-                ).build()
+            that(message).get { fieldsMap }.isEqualTo(
+                mapOf(
+                    TestField.ORDER_QTY.fieldName to 23000.toValue(),
+                    TestField.PRICE.fieldName to 122.123.toValue(),
+                    "ClOrdID" to "Some ID".toValue()
+                )
             )
-        }
-    }
-
-    @ParameterizedTest
-    @EnumSource(TestMessageType::class)
-    fun `test should add correct message type to the message metadata`(messageType: TestMessageType) {
-        val messageFromType = MessageBuilder create {
-            metadata {
-                this.messageType = messageType.typeName()
-            }
-            body {
-                repeat(10) {
-                    randomField() toValue randomString()
-                }
-            }
-        }
-
-        val messageFromString = MessageBuilder create {
-            metadata {
-                this.messageType = messageType.typeName()
-            }
-            body {
-                repeat(10) {
-                    randomField() toValue randomString()
-                }
-            }
-        }
-
-        expect {
-            that(messageFromType.messageType).isEqualTo(messageFromString.messageType).isEqualTo(messageType.typeName())
         }
     }
 
     @Test
-    fun `test should add correct body and metadata`() {
-        val message = MessageBuilder create {
-            metadata {
-                messageType = "SomeType"
-            }
-            body {
-                TestField.ORDER_QTY toValue 23000
-                TestField.NO_PARTY_IDS toMap {
-                    TestField.PRICE toValue 122.123
-                    TestField.CLIENT_ORDER_ID toValue "Some ID"
-                }
-            }
+    fun `test should add correct message type to the message metadata`() {
+        val messageFromType = message("test", ConnectionID.getDefaultInstance()) {
         }
 
-        val expectedMetadata = MessageMetadata.newBuilder().setMessageType("SomeType").build()
-        val expectedMessage = Message.newBuilder().setMetadata(expectedMetadata).putAllFields(
-            mapOf(
-                TestField.ORDER_QTY.fieldName to 23000.toValue(),
-                TestField.NO_PARTY_IDS.fieldName to Message.newBuilder().putAllFields(
-                    mapOf(
-                        TestField.PRICE.fieldName to 122.123.toValue(),
-                        TestField.CLIENT_ORDER_ID.fieldName to "Some ID".toValue()
-                    )
-                ).build().toValue()
-            )
-        ).build()
+        expect {
+            that(messageFromType.messageType).isEqualTo("test")
+        }
+    }
+
+    @Test
+    fun `test should add correct connection id`() {
+        val message = message("test", ConnectionID.newBuilder().setSessionAlias("alias").build()) {
+        }
 
         expect {
-            that(message).isEqualTo(expectedMessage)
+            that(message).get { metadata }.get { id }.get { connectionId }
+                .isEqualTo(ConnectionID.newBuilder().setSessionAlias("alias").build())
         }
     }
 
     @Test
     fun `test should wrap a nested map of fields`() {
-        val message = MessageBuilder create {
+        val message = message("test", ConnectionID.getDefaultInstance()) {
             body {
-                TestField.ORDER_QTY toValue 23000
-                TestField.NO_PARTY_IDS toMap {
-                    TestField.PRICE toValue 122.123
-                    TestField.CLIENT_ORDER_ID toValue "Some ID"
-                }
-                "NoPartyIDsAsString" toMap {
-                    "Price" toValue 122.123
-                    TestField.CLIENT_ORDER_ID toValue "Some ID"
+                TestField.NO_PARTY_IDS.fieldName to message {
+                    TestField.PRICE.fieldName to 122.123
+                    TestField.CLIENT_ORDER_ID.fieldName to "Some ID"
                 }
             }
         }
 
-        val expectedMessage = Message.newBuilder().putAllFields(
-            mapOf(
-                TestField.ORDER_QTY.fieldName to 23000.toValue(),
-                TestField.NO_PARTY_IDS.fieldName to Message.newBuilder().putAllFields(
-                    mapOf(
-                        TestField.PRICE.fieldName to 122.123.toValue(),
-                        TestField.CLIENT_ORDER_ID.fieldName to "Some ID".toValue()
-                    )
-                ).build().toValue(),
-                "NoPartyIDsAsString" to Message.newBuilder().putAllFields(
-                    mapOf(
-                        "Price" to 122.123.toValue(),
-                        TestField.CLIENT_ORDER_ID.fieldName to "Some ID".toValue()
-                    )
-                ).build().toValue()
-            )
-        ).build()
-
         expect {
-            that(message).isEqualTo(expectedMessage)
+            that(message).get { fieldsMap }
+                .getValue(TestField.NO_PARTY_IDS.fieldName)
+                .assertThat("has message") { it.hasMessageValue() }
+                .get { messageValue }
+                .get { fieldsMap }
+                .isEqualTo(mapOf(
+                    TestField.PRICE.fieldName to 122.123.toValue(),
+                    TestField.CLIENT_ORDER_ID.fieldName to "Some ID".toValue()
+                ))
         }
     }
 
     @Test
     fun `test should wrap a nested list of field maps`() {
-        val message = MessageBuilder create {
+        val message = message("test", ConnectionID.getDefaultInstance()) {
             body {
-                TestField.ORDER_QTY toValue "23000"
-                TestField.NO_PARTY_IDS toList {
-                    add {
-                        TestField.PRICE toValue 122.123
-                        TestField.CLIENT_ORDER_ID toValue "Some ID"
+                TestField.NO_PARTY_IDS.fieldName to list[
+                    message {
+                        TestField.PRICE.fieldName to 122.123
+                        TestField.CLIENT_ORDER_ID.fieldName to "Some ID"
                     }
-                    add {
-                        "RandomField" toValue 1.123
-                    }
-                    add("Some Value Here")
-                    add(112.23)
-                }
-                "TestField" toList {
-                    add {
-                        TestField.ORDER_QTY toValue 122.123
-                    }
-                }
-            }
-        }
-
-        val expectedMessage = Message.newBuilder().putAllFields(
-            mapOf(
-                TestField.ORDER_QTY.fieldName to "23000".toValue(),
-                TestField.NO_PARTY_IDS.fieldName to ListValue.newBuilder().addAllValues(
-                    listOf(
-                        Message.newBuilder().putAllFields(
-                            mapOf(
-                                TestField.PRICE.fieldName to "122.123".toValue(),
-                                TestField.CLIENT_ORDER_ID.fieldName to "Some ID".toValue()
-                            )
-                        ).build().toValue(),
-                        Message.newBuilder().putAllFields(
-                            mapOf(
-                                "RandomField" to 1.123.toValue()
-                            )
-                        ).build().toValue(),
-                        "Some Value Here".toValue(),
-                        112.23.toValue()
-                    )
-                ).build().toValue(),
-                "TestField" to ListValue.newBuilder().addValues(
-                    Message.newBuilder().putAllFields(
-                        mapOf(
-                            TestField.ORDER_QTY.fieldName to "122.123".toValue()
-                        )
-                    ).build().toValue()
-                ).build().toValue()
-            )
-        ).build()
-
-        expect {
-            that(message).isEqualTo(expectedMessage)
-        }
-    }
-
-    @Test
-    fun `test should wrap a nested list of a list of field maps`() {
-        val message = MessageBuilder create {
-            body {
-                TestField.ORDER_QTY toValue "23000"
-                TestField.TRADE_REPORT_ID toList {
-                    add {
-                        TestField.NO_PARTY_IDS toList {
-                            add {
-                                TestField.PRICE toValue "122.123"
-                                TestField.CLIENT_ORDER_ID toValue "Some ID"
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        val expectedMessage = Message.newBuilder().putAllFields(
-            mapOf(
-                TestField.ORDER_QTY.fieldName to "23000".toValue(),
-                TestField.TRADE_REPORT_ID.fieldName to ListValue.newBuilder().addValues(
-                    Message.newBuilder().putAllFields(
-                        mapOf(
-                            TestField.NO_PARTY_IDS.fieldName to ListValue.newBuilder().addValues(
-                                Message.newBuilder().putAllFields(
-                                    mapOf(
-                                        TestField.PRICE.fieldName to "122.123".toValue(),
-                                        TestField.CLIENT_ORDER_ID.fieldName to "Some ID".toValue()
-                                    )
-                                ).build().toValue()
-                            ).build().toValue()
-                        )
-                    ).build().toValue()
-                ).build().toValue()
-            )
-        ).build()
-
-        expect {
-            that(message).isEqualTo(expectedMessage)
-        }
-    }
-
-    @Test
-    fun `test messageBuilder`() {
-        val message = message {
-            metadata {
-                messageType = "MessageType"
-                protocol = "fix"
-                addProperty("name", "value")
-            }
-            body {
-                "field" to "simple value"
-                "complex" to message {
-                    "field" to 1
-                }
-                "collection" to list[1, 2, 3, 4]
-                "complexCollection" to list[
-                        message {
-                            "field" to 'a'
-                        },
-                        message {
-                            "field" to 'b'
-                        }
                 ]
-                "anotherCollection" buildList {
-                    addMessage {
-                        "a" to 'b'
-                    }
-
-                    addMessage {
-                        "a" to 'c'
-                    }
-                }
-
-                "anotherAnotherCollection" buildList {
-                    addValue("a")
-                    addValue("c")
-                }
             }
         }
 
-        val expectedMessage =
-            Message.newBuilder()
-                .setMetadata(
-                    MessageMetadata.newBuilder().setMessageType("MessageType").setProtocol("fix")
-                        .putProperties("name", "value")
+        expect {
+            that(message).get { fieldsMap }
+                .getValue(TestField.NO_PARTY_IDS.fieldName)
+                .assertThat("has collection") { it.hasListValue() }
+                .get { listValue }
+                .get { valuesList }
+                .containsExactly(
+                    Message.newBuilder().putAllFields(
+                        mapOf(
+                            TestField.PRICE.fieldName to "122.123".toValue(),
+                            TestField.CLIENT_ORDER_ID.fieldName to "Some ID".toValue()
+                        )
+                    ).build().toValue(),
                 )
-                .putFields("field", "simple value".toValue())
-                .putFields("complex", Message.newBuilder().putFields("field", 1.toValue()).toValue())
-                .putFields(
-                    "collection",
-                    ListValue.newBuilder()
-                        .add(1.toValue())
-                        .add(2.toValue())
-                        .add(3.toValue())
-                        .add(4.toValue()).build()
-                        .toValue()
-                )
-                .putFields(
-                    "complexCollection",
-                    ListValue.newBuilder()
-                        .add(Message.newBuilder().putFields("field", "a".toValue()).toValue())
-                        .add(Message.newBuilder().putFields("field", "b".toValue()).toValue()).toValue()
-                )
-                .putFields(
-                    "anotherCollection",
-                    ListValue.newBuilder()
-                        .add(Message.newBuilder().putFields("a", "b".toValue()).toValue())
-                        .add(Message.newBuilder().putFields("a", "c".toValue()).toValue()).build()
-                        .toValue()
-                )
-                .putFields(
-                    "anotherAnotherCollection",
-                    ListValue.newBuilder()
-                        .add("a".toValue())
-                        .add("c".toValue()).build()
-                        .toValue()
-                )
-                .build()
+        }
+    }
+
+    @Test
+    fun `test should wrap a nested list of simple values`() {
+        val message = message("test", ConnectionID.getDefaultInstance()) {
+            body {
+                TestField.NO_PARTY_IDS.fieldName to list["test"]
+            }
+        }
 
         expect {
-            that(message).isEqualTo(expectedMessage)
+            that(message).get { fieldsMap }
+                .getValue(TestField.NO_PARTY_IDS.fieldName)
+                .assertThat("has collection") { it.hasListValue() }
+                .get { listValue }
+                .get { valuesList }
+                .containsExactly("test".toValue())
         }
     }
 }

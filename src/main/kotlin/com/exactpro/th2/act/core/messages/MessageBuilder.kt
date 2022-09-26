@@ -20,30 +20,63 @@ import com.exactpro.th2.common.grpc.*
 import com.exactpro.th2.common.value.nullValue
 import com.exactpro.th2.common.value.toValue
 
-fun message(block: MessageBuilder.() -> Unit): Message {
-    return MessageBuilder.create(block)
+@DslMarker
+annotation class MessageBuilderMarker
+
+fun main() {
+    val connectionID = ConnectionID.getDefaultInstance()
+    message("MessageType", connectionID) {
+        metadata {
+            protocol = "fix"
+            addProperty("name", "value")
+            // or
+            properties = mapOf(
+                "name" to "value"
+            )
+        }
+        body {
+            "field" to "simple value"
+            "complex" to message {
+                "field" to 1
+            }
+            "collection" to list[1, 2, 3, 4]
+            "complexCollection" to list[
+                    message {
+                        "field" to 'a'
+                    },
+                    message {
+                        "field" to 'b'
+                    }
+            ]
+            "anotherCollection" buildList {
+                addMessage {
+                    "a" to 'b'
+                }
+
+                addMessage {
+                    "a" to 'c'
+                }
+            }
+
+            "anotherAnotherCollection" buildList {
+                addValue("a")
+                addValue("c")
+            }
+        }
+    }
 }
 
-@DslMarker
-annotation class BuilderMarker
+fun message(type: String, connectionID: ConnectionID, setup: MessageBuilder.() -> Unit): Message =
+    MessageBuilder(type, connectionID).also(setup).build()
 
-@BuilderMarker
-class MessageBuilder {
+
+@MessageBuilderMarker
+class MessageBuilder(type: String, connectionID: ConnectionID) {
     private val builder: Message.Builder = Message.newBuilder()
 
-    /**
-     * Adds the [MessageMetadata] initialized using the specified code block to this [MessageBuilder].
-     */
-    fun metadata(metadataBlock: MessageMetadataBuilder.() -> Unit) {
-        builder.metadata = MessageMetadataBuilder().also(metadataBlock).build()
-    }
-
-    /**
-     * Appends all fields present in the [MessageBodyBuilder] initialized with the specified code block to this
-     * [MessageBuilder].
-     */
-    fun body(bodyBlock: MessageBodyBuilder.() -> Unit) {
-        MessageBodyBuilder(builder).also(bodyBlock)
+    init {
+        builder.metadataBuilder.messageType = type
+        builder.metadataBuilder.setId(MessageID.newBuilder().setConnectionId(connectionID))
     }
 
     var parentEventId: EventID
@@ -52,88 +85,62 @@ class MessageBuilder {
             builder.parentEventId = value
         }
 
+    val metadata: MessageMetadataBuilder = MessageMetadataBuilder(builder.metadataBuilder)
+
+    val body: MessageBodyBuilder = MessageBodyBuilder(builder)
+
+    operator fun MessageMetadataBuilder.invoke(action: MessageMetadataBuilder.() -> Unit) = action()
+
+    operator fun MessageBodyBuilder.invoke(action: MessageBodyBuilder.() -> Unit): MessageBodyBuilder =
+        apply(action)
+
     /**
      * Builds a [Message] according to the current state of this builder.
      */
-    fun build(): Message = builder.build()
-
-    companion object {
-        /**
-         * Creates a message according to the specified message body.
-         */
-        infix fun create(messageBlock: MessageBuilder.() -> Unit): Message = MessageBuilder().also(messageBlock).build()
-    }
+    internal fun build(): Message = builder.build()
 }
 
 
-@BuilderMarker
-class MessageMetadataBuilder {
-    private val metadataBuilder: MessageMetadata.Builder = MessageMetadata.newBuilder()
-
-    var messageType: String
-        get() = metadataBuilder.messageType
-        set(value) {
-            metadataBuilder.messageType = value
-        }
-
+@MessageBuilderMarker
+class MessageMetadataBuilder(
+    private val metadataBuilder: MessageMetadata.Builder
+) {
     var protocol: String
         get() = metadataBuilder.protocol
         set(value) {
             metadataBuilder.protocol = value
         }
 
+    var direction: Direction
+        get() = metadataBuilder.idBuilder.direction
+        set(value) {
+            metadataBuilder.idBuilder.direction = value
+        }
+
+    var sequence: Long
+        get() = metadataBuilder.idBuilder.sequence
+        set(value) {
+            metadataBuilder.idBuilder.sequence = value
+        }
+
     fun addProperty(name: String, value: String) {
         metadataBuilder.putProperties(name, value)
     }
 
-    fun id (messageBlock: MessageIDBuilder.() -> Unit) {
-        metadataBuilder.id = MessageIDBuilder().also(messageBlock).build()
-    }
-
-    /**
-     * Builds a [MessageMetadata] according to the current state of this builder.
-     */
-    fun build(): MessageMetadata = metadataBuilder.build()
+    var properties: Map<String, String>
+        get() = metadataBuilder.propertiesMap
+        set(value) {
+            metadataBuilder.clearProperties()
+            metadataBuilder.putAllProperties(value)
+        }
 }
 
-
-
-@BuilderMarker
-class MessageIDBuilder{
-    private val messageIDBuilder: MessageID.Builder = MessageID.newBuilder()
-
-    var direction: Direction
-        get() = messageIDBuilder.direction
-        set(value) {
-            messageIDBuilder.direction = value
-        }
-
-    var sessionAlias: String
-        get() = messageIDBuilder.connectionId.sessionAlias
-        set(value) {
-            connectionId = ConnectionID.newBuilder().setSessionAlias(value).build()
-        }
-
-    var connectionId: ConnectionID
-        get() = messageIDBuilder.connectionId
-        set(value) {
-            messageIDBuilder.connectionId = value
-        }
-
-    var sequence: Long
-        get() = messageIDBuilder.sequence
-        set(value) {
-            messageIDBuilder.sequence = value
-        }
-
-    fun build(): MessageID = messageIDBuilder.build()
-}
-
-@BuilderMarker
+@MessageBuilderMarker
 class MessageBodyBuilder(
-     val messageBuilder: Message.Builder = Message.newBuilder()
+    internal val messageBuilder: Message.Builder = Message.newBuilder(),
 ) {
-    fun message(action: MessageBodyBuilder.() -> Unit): MessageBodyBuilder = MessageBodyBuilder(Message.newBuilder()).apply(action)
+    fun message(action: MessageBodyBuilder.() -> Unit): MessageBodyBuilder =
+        MessageBodyBuilder(Message.newBuilder()).apply(action)
 
     val list: ListValueFactory = ListValueFactory
 
@@ -148,54 +155,15 @@ class MessageBodyBuilder(
     }
 
     /**
-     * Adds a key value pair to this [MessageBodyBuilder], where the value is *not* a nested structure.
-     */
-    infix fun IField.toValue(value: Any) {
-        this.fieldName toValue value
-    }
-
-    /**
      * Adds a key (as a [String]) value pair to this [MessageBodyBuilder], where the value is *not* a nested structure.
      */
-    infix fun String.toValue(value: Any) {
+    infix fun String.to(value: Any?) {
         messageBuilder.putFields(this, value.toValue())
-    }
-
-    /**
-     * Adds a key value pair to this [MessageBodyBuilder], where the value is a nested body definition.
-     */
-    infix fun IField.toMap(bodyBlock: MessageBodyBuilder.() -> Unit) {
-        this.fieldName toMap bodyBlock
     }
 
     /**
      * Adds a key (as a [String]) value pair to this [MessageBodyBuilder], where the value is a nested body definition.
      */
-    infix fun String.toMap(bodyBlock: MessageBodyBuilder.() -> Unit) {
-        messageBuilder.putFields(this, MessageBuilder.create { body(bodyBlock) }.toValue())
-    }
-
-    /**
-     * Adds a key value pair to this [MessageBodyBuilder], where the value is a nested list definition.
-     */
-    infix fun IField.toList(listBlock: ListValueBuilder.() -> Unit) {
-        this.fieldName toList listBlock
-    }
-
-    /**
-     * Adds a key (as a [String]) value pair to this [MessageBodyBuilder], where the value is a nested list definition.
-     */
-    infix fun String.toList(listBlock: ListValueBuilder.() -> Unit) {
-        messageBuilder.putFields(this, ListValueBuilder().also(listBlock).build().toValue())
-    }
-
-    /**
-     * Adds a key (as a [String]) value pair to this [MessageBodyBuilder], where the value is *not* a nested structure.
-     */
-    infix fun String.to(value: Any) {
-        messageBuilder.putFields(this, value.toValue())
-    }
-
     infix fun String.to(message: MessageBodyBuilder) {
         messageBuilder.putFields(this, message.messageBuilder.toValue())
     }
@@ -207,11 +175,14 @@ class MessageBodyBuilder(
     infix fun String.buildList(action: ListValueBuilder.() -> Unit) {
         this to ListValueBuilder().apply(action)
     }
+
+    fun build(): Message = messageBuilder.build()
 }
 
 
-@BuilderMarker
+@MessageBuilderMarker
 class ListValueBuilder {
+
     private val listValueBuilder: ListValue.Builder = ListValue.newBuilder()
 
     fun addMessage(action: MessageBodyBuilder.() -> Unit) {
@@ -225,23 +196,22 @@ class ListValueBuilder {
     /**
      * Adds the specified body definition to this [ListValueBuilder].
      */
-    fun add(body: MessageBodyBuilder) {
+    internal fun add(body: MessageBodyBuilder) {
         listValueBuilder.addValues(body.messageBuilder.toValue())
-    }
-
-    fun add(bodyBlock: MessageBodyBuilder.() -> Unit) {
-        listValueBuilder.addValues(MessageBuilder.create { body(bodyBlock) }.toValue())
     }
 
     /**
      * Adds the specified simple value to this [ListValueBuilder].
      */
-    fun add(value: Any?) {
-        listValueBuilder.addValues(value?.toValue() ?: nullValue())
+    internal fun add(value: Any?) {
+        listValueBuilder.addValues(value.toValue())
     }
 
     /**
      * Builds a [ListValue] according to the current state of this [ListValueBuilder].
      */
-    fun build(): ListValue = listValueBuilder.build()
+    internal fun build(): ListValue = listValueBuilder.build()
 }
+
+private val NULL_VALUE = nullValue()
+private fun Any?.toValue(): Value = this?.toValue() ?: NULL_VALUE

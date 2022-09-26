@@ -85,19 +85,15 @@ class TestDSL {
         direction: Direction,
         sequence: Long,
         field: Map<String, String> = mutableMapOf()
-    ): Message = message {
+    ): Message = message(messageType, ConnectionID.newBuilder().setSessionAlias(sessionAlias).build()) {
             parentEventId = parentEventID
             metadata {
-                this.messageType = messageType
-                id {
-                    this.direction = direction
-                    this.sessionAlias = sessionAlias
-                    this.sequence = sequence
-                }
+                this.direction = direction
+                this.sequence = sequence
             }
             body {
                 field.forEach { (key, value) ->
-                    key toValue value
+                    key to value
                 }
             }
         }
@@ -166,16 +162,17 @@ class TestDSL {
         var sequence = 1L
         while (sequence <= 4L) {
             messages.add(
-                messageBuild("QuoteStatusReport", "anotherSessionAlias", Direction.FIRST, sequence, mapOf("quoteId" to "quoteId", "quoteStatus" to "Accepted"))
+                messageBuild("QuoteStatusReport",
+                    if (sequence == 1L) "sessionAlias" else "anotherSessionAlias",
+                    Direction.FIRST, sequence, mapOf("quoteId" to "quoteId", "quoteStatus" to "Accepted"))
             )
             sequence++
         }
 
         actionFactory.apply {
             createAction(observer, rpcName, randomString(), parentEventID, 3000)
-                .preFilter { msg -> msg.direction == Direction.FIRST && msg.sessionAlias == "anotherSessionAlias" }
                 .execute {
-                    val quote: Message = send(messages[0], "sessionAlias", 1000)
+                    val quote: Message = send(messages[0], timeout = 1000)
 
                     executorService.schedule(
                         fun() {
@@ -186,7 +183,7 @@ class TestDSL {
                     )
 
                     val quoteStatusReportOne =
-                        receive(1000, "anotherSessionAlias", Direction.FIRST) {
+                        receive(1000, "sessionAlias", Direction.FIRST) {
                             passOn("QuoteStatusReport") {
                                 this.getString("quoteId") == quote.getString("quoteId")
                                         && this.getString("quoteStatus") == "Accepted"
@@ -337,11 +334,7 @@ class TestDSL {
     }
 
     fun createDQ126(): Message =
-        message {
-            metadata {
-                messageType = "DQ126"
-                id { sessionAlias = "sessionAlias" }
-            }
+        message("DQ126", ConnectionID.newBuilder().setSessionAlias("sessionAlias").build()) {
         }
 
     fun updateDQ126(dq126: Message, segment: String): Message = dq126.toBuilder()
@@ -472,18 +465,10 @@ class TestDSL {
                 .preFilter { msg -> (msg.direction == Direction.FIRST || msg.direction == Direction.SECOND) && msg.sessionAlias == "sessionAlias" }
                 .execute {
                     send(
-                        message {
+                        message("NewOrderSingle", ConnectionID.newBuilder().setSessionAlias("sessionAlias").build()) {
                             parentEventId = parentEventID
-                            metadata {
-                                messageType = "NewOrderSingle"
-                                id {
-                                    direction = Direction.FIRST
-                                    sessionAlias = "sessionAlias"
-                                    sequence = 5L
-                                }
-                            }
                         },
-                        "sessionAlias", 1000
+                        timeout = 1000
                     )
 
                     executorService.schedule(

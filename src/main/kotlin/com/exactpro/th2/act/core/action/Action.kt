@@ -64,6 +64,9 @@ class Action<T>(
         description: String = ""
     ): Message {
         checkingContext()
+        require(message.sessionAlias == sessionAlias) {
+            "session alias '${message.sessionAlias}' in the message does not match the specified alias '$sessionAlias' in the 'send' method"
+        }
 
         if (cleanBuffer) {
             responseReceiver.cleanMessageBuffer()
@@ -152,7 +155,6 @@ class Action<T>(
             )
 
             checkpointRequest.parentEventId = eventID
-            requestContext.parentEventID = eventID
         }
 
         val response: CheckpointResponse = check1Service.createCheckpoint(checkpointRequest.build())
