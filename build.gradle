@@ -38,6 +38,12 @@ repositories {
     mavenLocal()
 }
 
+configurations {
+    compileClasspath {
+        resolutionStrategy.activateDependencyLocking()
+    }
+}
+
 dependencies {
     api platform("com.exactpro.th2:bom:3.0.0")
 
