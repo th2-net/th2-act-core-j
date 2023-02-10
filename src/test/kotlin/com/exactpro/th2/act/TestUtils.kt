@@ -23,7 +23,9 @@ import com.exactpro.th2.act.core.rules.MessageFields
 import com.exactpro.th2.act.core.rules.MessageFieldsCheckRule
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.grpc.*
+import com.exactpro.th2.common.message.toTimestamp
 import com.exactpro.th2.common.value.toValue
+import java.time.Instant
 import org.apache.commons.lang3.RandomStringUtils
 
 enum class TestMessageType(private val typeName: String) {
@@ -147,11 +149,17 @@ fun TestMessageType.toMessage(
     connectionID: ConnectionID,
     fields: Map<IField, Any>,
     direction: Direction = Direction.FIRST,
-    parentEventID: EventID? = null
+    parentEventID: EventID? = null,
 ): Message {
     val metadata = MessageMetadata.newBuilder()
         .setMessageType(this.typeName())
-        .setId(MessageID.newBuilder().setConnectionId(connectionID).setDirection(direction))
+        .setId(
+            MessageID.newBuilder()
+                .setConnectionId(connectionID)
+                .setDirection(direction)
+                .setBookName("bookName")
+                .setSequence(1)
+                .setTimestamp(Instant.now().toTimestamp()))
 
     return Message.newBuilder()
         .setMetadata(metadata)
@@ -204,7 +212,7 @@ fun Message.toBatch(): MessageBatch = MessageBatch.newBuilder().addMessages(this
 /**
  * Creates an [EventID] from this string.
  */
-fun String.toEventID(): EventID = EventID.newBuilder().setId(this).build()
+fun String.toEventID(): EventID = EventID.newBuilder().setId(this).setBookName("bookName").build()
 
 /**
  * Creates an [Event] from this event ID.

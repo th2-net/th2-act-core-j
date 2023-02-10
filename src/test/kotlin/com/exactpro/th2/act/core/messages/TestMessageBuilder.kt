@@ -17,19 +17,11 @@
 package com.exactpro.th2.act.core.messages
 
 import com.exactpro.th2.act.TestField
-import com.exactpro.th2.act.TestMessageType
-import com.exactpro.th2.act.randomField
-import com.exactpro.th2.act.randomString
 import com.exactpro.th2.common.grpc.ConnectionID
-import com.exactpro.th2.common.grpc.ListValue
 import com.exactpro.th2.common.grpc.Message
-import com.exactpro.th2.common.grpc.MessageMetadata
 import com.exactpro.th2.common.message.messageType
-import com.exactpro.th2.common.value.add
 import com.exactpro.th2.common.value.toValue
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.EnumSource
 import strikt.api.expect
 import strikt.assertions.containsExactly
 import strikt.assertions.getValue
@@ -48,7 +40,7 @@ internal class TestMessageBuilder {
 
     @Test
     fun `test should wrap a flat map of fields`() {
-        val message = message("test", ConnectionID.getDefaultInstance()) {
+        val message = message("test", ConnectionID.getDefaultInstance(), "book") {
             body {
                 TestField.ORDER_QTY.fieldName to 23000
                 TestField.PRICE.fieldName to 122.123
@@ -69,7 +61,7 @@ internal class TestMessageBuilder {
 
     @Test
     fun `test should add correct message type to the message metadata`() {
-        val messageFromType = message("test", ConnectionID.getDefaultInstance()) {
+        val messageFromType = message("test", ConnectionID.getDefaultInstance(), "book") {
         }
 
         expect {
@@ -79,7 +71,7 @@ internal class TestMessageBuilder {
 
     @Test
     fun `test should add correct connection id`() {
-        val message = message("test", ConnectionID.newBuilder().setSessionAlias("alias").build()) {
+        val message = message("test", ConnectionID.newBuilder().setSessionAlias("alias").build(), "book") {
         }
 
         expect {
@@ -90,7 +82,7 @@ internal class TestMessageBuilder {
 
     @Test
     fun `test should wrap a nested map of fields`() {
-        val message = message("test", ConnectionID.getDefaultInstance()) {
+        val message = message("test", ConnectionID.getDefaultInstance(), "book") {
             body {
                 TestField.NO_PARTY_IDS.fieldName to message {
                     TestField.PRICE.fieldName to 122.123
@@ -114,7 +106,7 @@ internal class TestMessageBuilder {
 
     @Test
     fun `test should wrap a nested list of field maps`() {
-        val message = message("test", ConnectionID.getDefaultInstance()) {
+        val message = message("test", ConnectionID.getDefaultInstance(), "book") {
             body {
                 TestField.NO_PARTY_IDS.fieldName to list[
                     message {
@@ -144,7 +136,7 @@ internal class TestMessageBuilder {
 
     @Test
     fun `test should wrap a nested list of simple values`() {
-        val message = message("test", ConnectionID.getDefaultInstance()) {
+        val message = message("test", ConnectionID.getDefaultInstance(), "book") {
             body {
                 TestField.NO_PARTY_IDS.fieldName to list["test"]
             }

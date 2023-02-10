@@ -17,15 +17,18 @@
 package com.exactpro.th2.act.core.messages
 
 import com.exactpro.th2.common.grpc.*
+import com.exactpro.th2.common.message.toTimestamp
+import com.exactpro.th2.common.schema.message.impl.rabbitmq.BookName
 import com.exactpro.th2.common.value.nullValue
 import com.exactpro.th2.common.value.toValue
+import java.time.Instant
 
 @DslMarker
 annotation class MessageBuilderMarker
 
 fun main() {
     val connectionID = ConnectionID.getDefaultInstance()
-    message("MessageType", connectionID) {
+    message("MessageType", connectionID, "book") {
         metadata {
             protocol = "fix"
             addProperty("name", "value")
@@ -66,17 +69,22 @@ fun main() {
     }
 }
 
-fun message(type: String, connectionID: ConnectionID, setup: MessageBuilder.() -> Unit): Message =
-    MessageBuilder(type, connectionID).also(setup).build()
+fun message(type: String, connectionID: ConnectionID, bookName: String, setup: MessageBuilder.() -> Unit): Message =
+    MessageBuilder(type, connectionID, bookName).also(setup).build()
 
 
 @MessageBuilderMarker
-class MessageBuilder(type: String, connectionID: ConnectionID) {
+class MessageBuilder(type: String, connectionID: ConnectionID, bookName: String) {
     private val builder: Message.Builder = Message.newBuilder()
 
     init {
         builder.metadataBuilder.messageType = type
-        builder.metadataBuilder.setId(MessageID.newBuilder().setConnectionId(connectionID))
+        builder.metadataBuilder.setId(
+            MessageID.newBuilder()
+                .setBookName(bookName)
+                .setTimestamp(Instant.now().toTimestamp())
+                .setConnectionId(connectionID)
+        )
     }
 
     var parentEventId: EventID

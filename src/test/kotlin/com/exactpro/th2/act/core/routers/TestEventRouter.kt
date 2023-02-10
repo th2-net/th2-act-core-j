@@ -60,13 +60,13 @@ internal class TestEventRouter {
     @BeforeEach
     internal fun setUp() {
         eventBatchRouter = StubMessageRouter()
-        eventRouter = EventRouter(eventBatchRouter)
+        eventRouter = EventRouter(eventBatchRouter, "bookName")
     }
 
     @Test
     fun `test should submit an event to the event batch router`() {
         val event = randomEvent()
-        val expectedProtoEvent = event.toProto(null)
+        val expectedProtoEvent = event.toProto("bookName")
         eventRouter.storeEvent(event)
 
         expect {
@@ -77,7 +77,7 @@ internal class TestEventRouter {
     @Test
     fun `test should submit multiple events to the event batch router`() {
         val events = 5 of { randomEvent() }
-        val expectedProtoEvents = events.map { it.toProto(null) }.toList() // Stirkt Bug: Must be list.
+        val expectedProtoEvents = events.map { it.toProto("bookName") }.toList() // Stirkt Bug: Must be list.
         eventRouter.storeEvents(events.toList())
 
         expect {

@@ -41,11 +41,12 @@ import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 import com.exactpro.th2.act.core.messages.message
 import com.exactpro.th2.check1.grpc.Check1Service
+import com.exactpro.th2.common.schema.message.DeliveryMetadata
 
 class TestDSL {
     lateinit var messageRouter: MessageRouter
     lateinit var eventRouter: EventRouter
-    val parentEventID: EventID = EventID.newBuilder().setId("eventId").build()
+    val parentEventID: EventID = EventID.newBuilder().setId("eventId").setBookName("book").setScope("scope").build()
     val subscriptionManager: SubscriptionManager = spyk()
     lateinit var actionFactory: ActionFactory
     var observer: StreamObserver<Message> = spyk()
@@ -59,7 +60,7 @@ class TestDSL {
     internal fun setUp() {
         val messageBatchRouter: StubMessageRouter<MessageBatch> = spyk()
         messageRouter = MessageRouter(messageBatchRouter)
-        eventRouter = EventRouter(eventBatchRouter)
+        eventRouter = EventRouter(eventBatchRouter, "bookName")
 
         val listeners: Map<Direction, MessageBatchListener> = mapOf(
             Direction.FIRST to getMockListener("First Direction Mock"),
@@ -73,9 +74,9 @@ class TestDSL {
 
     fun getMockListener(name: String? = null): MessageBatchListener {
         return if (name == null) {
-            mockk { justRun { handler(any(), any()) } }
+            mockk { justRun { handle(any(), any()) } }
         } else {
-            mockk(name) { justRun { handler(any(), any()) } }
+            mockk(name) { justRun { handle(any(), any()) } }
         }
     }
 
@@ -85,7 +86,7 @@ class TestDSL {
         direction: Direction,
         sequence: Long,
         field: Map<String, String> = mutableMapOf()
-    ): Message = message(messageType, ConnectionID.newBuilder().setSessionAlias(sessionAlias).build()) {
+    ): Message = message(messageType, ConnectionID.newBuilder().setSessionAlias(sessionAlias).build(), "book") {
             parentEventId = parentEventID
             metadata {
                 this.direction = direction
@@ -112,7 +113,7 @@ class TestDSL {
                 .preFilter { msg -> msg.sessionAlias == "sessionAlias"
                         && (msg.direction == Direction.FIRST || msg.direction == Direction.SECOND) }
                 .execute {
-                    messages.forEach { subscriptionManager.handler(randomString(), it.toBatch()) }
+                    messages.forEach { subscriptionManager.handle(DeliveryMetadata(randomString()), it.toBatch()) }
 
                     val echoMessage = send(
                         messages[0], "sessionAlias", 1000, waitEcho = true, cleanBuffer = false
@@ -141,7 +142,7 @@ class TestDSL {
                 .execute {
                     send(messages[0], "sessionAlias", 1000)
 
-                    messages.forEach { subscriptionManager.handler(randomString(), it.toBatch()) }
+                    messages.forEach { subscriptionManager.handle(DeliveryMetadata(randomString()), it.toBatch()) }
                     val receiveMessage = receive(1000, "sessionAlias", Direction.FIRST) {
                         passOn("NewOrderSingle") { sequence == 2L }
                         failOn("NewOrderSingle") { sequence == 3L }
@@ -176,7 +177,7 @@ class TestDSL {
 
                     executorService.schedule(
                         fun() {
-                            messages.forEach { subscriptionManager.handler(randomString(), it.toBatch()) }
+                            messages.forEach { subscriptionManager.handle(DeliveryMetadata(randomString()), it.toBatch()) }
                         },
                         500,
                         TimeUnit.MILLISECONDS
@@ -237,7 +238,7 @@ class TestDSL {
 
                     executorService.scheduleAtFixedRate(
                         fun() {
-                            messages.forEach { subscriptionManager.handler(randomString(), it.toBatch()) }
+                            messages.forEach { subscriptionManager.handle(DeliveryMetadata(randomString()), it.toBatch()) }
                         },
                         0,
                         1500,
@@ -274,10 +275,9 @@ class TestDSL {
     @Test
     fun `case three`() {
         val result = Message.newBuilder()
-        var segmentNum = 4
 
         val expectedMessages = mutableListOf<Message>()
-        for (segment in 0..4) {
+        for (segment in 1..5) {
             expectedMessages.add(updateDQ126(createDQ126(), segment.toString()))
         }
 
@@ -286,8 +286,8 @@ class TestDSL {
                 .preFilter { msg -> msg.direction == Direction.FIRST && (msg.sessionAlias == "sessionAlias" || msg.sessionAlias == "anotherSessionAlias") }
                 .execute {
                     expectedMessages.forEach {
-                        subscriptionManager.handler(
-                            randomString(), it.toBatch()
+                        subscriptionManager.handle(
+                            DeliveryMetadata(randomString()), it.toBatch()
                         )
                     }
 
@@ -299,7 +299,7 @@ class TestDSL {
 
                         executorService.schedule(
                             fun() {
-                                subscriptionManager.handler(randomString(), expectedMessages[i].toBatch())
+                                subscriptionManager.handle(DeliveryMetadata(randomString()), expectedMessages[i].toBatch())
                             },
                             1500,
                             TimeUnit.MILLISECONDS
@@ -308,10 +308,10 @@ class TestDSL {
 
                         val responseDQ126 = receive(1000, "sessionAlias", Direction.FIRST) {
                             passOn("DQ126") {
-                                this.sequence <= 4L
+                                this.sequence <= 5L
                             }
                             failOn("DQ126") {
-                                this.sequence > 4L
+                                this.sequence > 5L
                             }
                         }
                         listMessagesDQ126.add(responseDQ126)
@@ -319,13 +319,11 @@ class TestDSL {
                         if (segment.toInt() == 0) break
                         else messageDQ126 = updateDQ126(messageDQ126, segment)
 
-                        segmentNum--
-
-                    } while (segment.toInt() > 0)
+                    } while (segment.toInt() > 1)
                     listMessagesDQ126.forEach {
                         emitResult(result.addField("Received a DQ126 message", it).build())
                     }
-                    for (it in 0..3) {
+                    for (it in 1..4) {
                         assertEquals(expectedMessages[it], listMessagesDQ126[it])
                     }
                 }
@@ -334,7 +332,7 @@ class TestDSL {
     }
 
     fun createDQ126(): Message =
-        message("DQ126", ConnectionID.newBuilder().setSessionAlias("sessionAlias").build()) {
+        message("DQ126", ConnectionID.newBuilder().setSessionAlias("sessionAlias").build(), "book") {
         }
 
     fun updateDQ126(dq126: Message, segment: String): Message = dq126.toBuilder()
@@ -356,7 +354,7 @@ class TestDSL {
                 .execute {
                     executorService.schedule(
                         fun() {
-                            messages.forEach { subscriptionManager.handler(randomString(), it.toBatch()) }
+                            messages.forEach { subscriptionManager.handle(DeliveryMetadata(randomString()), it.toBatch()) }
                         },
                         500,
                         TimeUnit.MILLISECONDS
@@ -389,7 +387,7 @@ class TestDSL {
                 .execute {
                     executorService.schedule(
                         fun() {
-                            messages.forEach { subscriptionManager.handler(randomString(), it.toBatch()) }
+                            messages.forEach { subscriptionManager.handle(DeliveryMetadata(randomString()), it.toBatch()) }
                         },
                         500,
                         TimeUnit.MILLISECONDS
@@ -428,7 +426,7 @@ class TestDSL {
                 .preFilter { msg -> msg.sessionAlias == "sessionAlias" && (msg.direction == Direction.FIRST
                         || msg.direction == Direction.SECOND) }
                 .execute {
-                    messages.forEach { subscriptionManager.handler(randomString(), it.toBatch()) }
+                    messages.forEach { subscriptionManager.handle(DeliveryMetadata(randomString()), it.toBatch()) }
 
                     val echoMessage: Message = send(messages[0], "sessionAlias", 1000, true, cleanBuffer = false)
                     assertEquals(messages[1], echoMessage)
@@ -465,7 +463,7 @@ class TestDSL {
                 .preFilter { msg -> (msg.direction == Direction.FIRST || msg.direction == Direction.SECOND) && msg.sessionAlias == "sessionAlias" }
                 .execute {
                     send(
-                        message("NewOrderSingle", ConnectionID.newBuilder().setSessionAlias("sessionAlias").build()) {
+                        message("NewOrderSingle", ConnectionID.newBuilder().setSessionAlias("sessionAlias").build(), "book") {
                             parentEventId = parentEventID
                         },
                         timeout = 1000
@@ -473,7 +471,7 @@ class TestDSL {
 
                     executorService.schedule(
                         fun() {
-                            messages.forEach { subscriptionManager.handler(randomString(), it.toBatch()) }
+                            messages.forEach { subscriptionManager.handle(DeliveryMetadata(randomString()), it.toBatch()) }
                         },
                         500,
                         TimeUnit.MILLISECONDS
@@ -520,7 +518,7 @@ class TestDSL {
 
                     executorService.schedule(
                         fun() {
-                            messages.forEach { subscriptionManager.handler(randomString(), it.toBatch()) }
+                            messages.forEach { subscriptionManager.handle(DeliveryMetadata(randomString()), it.toBatch()) }
                         },
                         1500,
                         TimeUnit.MILLISECONDS
@@ -563,7 +561,7 @@ class TestDSL {
                 .execute {
                     send(messages[0], "sessionAlias", 1000)
 
-                    messages.forEach { subscriptionManager.handler(randomString(), it.toBatch()) }
+                    messages.forEach { subscriptionManager.handle(DeliveryMetadata(randomString()), it.toBatch()) }
 
                     receive(1000, "sessionAlias", Direction.FIRST) {
                         passOn("NewOrderSingle") {
