@@ -40,7 +40,7 @@ internal class TestMessageBuilder {
 
     @Test
     fun `test should wrap a flat map of fields`() {
-        val message = message("test", ConnectionID.getDefaultInstance(), "book") {
+        val message = message("test", ConnectionID.getDefaultInstance()) {
             body {
                 TestField.ORDER_QTY.fieldName to 23000
                 TestField.PRICE.fieldName to 122.123
@@ -61,7 +61,7 @@ internal class TestMessageBuilder {
 
     @Test
     fun `test should add correct message type to the message metadata`() {
-        val messageFromType = message("test", ConnectionID.getDefaultInstance(), "book") {
+        val messageFromType = message("test", ConnectionID.getDefaultInstance()) {
         }
 
         expect {
@@ -71,8 +71,7 @@ internal class TestMessageBuilder {
 
     @Test
     fun `test should add correct connection id`() {
-        val message = message("test", ConnectionID.newBuilder().setSessionAlias("alias").build(), "book") {
-        }
+        val message = message("test", ConnectionID.newBuilder().setSessionAlias("alias").build()) {}
 
         expect {
             that(message).get { metadata }.get { id }.get { connectionId }
@@ -82,7 +81,7 @@ internal class TestMessageBuilder {
 
     @Test
     fun `test should wrap a nested map of fields`() {
-        val message = message("test", ConnectionID.getDefaultInstance(), "book") {
+        val message = message("test", ConnectionID.getDefaultInstance()) {
             body {
                 TestField.NO_PARTY_IDS.fieldName to message {
                     TestField.PRICE.fieldName to 122.123
@@ -106,7 +105,7 @@ internal class TestMessageBuilder {
 
     @Test
     fun `test should wrap a nested list of field maps`() {
-        val message = message("test", ConnectionID.getDefaultInstance(), "book") {
+        val message = message("test", ConnectionID.getDefaultInstance()) {
             body {
                 TestField.NO_PARTY_IDS.fieldName to list[
                     message {
@@ -136,7 +135,7 @@ internal class TestMessageBuilder {
 
     @Test
     fun `test should wrap a nested list of simple values`() {
-        val message = message("test", ConnectionID.getDefaultInstance(), "book") {
+        val message = message("test", ConnectionID.getDefaultInstance()) {
             body {
                 TestField.NO_PARTY_IDS.fieldName to list["test"]
             }

@@ -26,62 +26,19 @@ import java.time.Instant
 @DslMarker
 annotation class MessageBuilderMarker
 
-fun main() {
-    val connectionID = ConnectionID.getDefaultInstance()
-    message("MessageType", connectionID, "book") {
-        metadata {
-            protocol = "fix"
-            addProperty("name", "value")
-            // or
-            properties = mapOf(
-                "name" to "value"
-            )
-        }
-        body {
-            "field" to "simple value"
-            "complex" to message {
-                "field" to 1
-            }
-            "collection" to list[1, 2, 3, 4]
-            "complexCollection" to list[
-                    message {
-                        "field" to 'a'
-                    },
-                    message {
-                        "field" to 'b'
-                    }
-            ]
-            "anotherCollection" buildList {
-                addMessage {
-                    "a" to 'b'
-                }
-
-                addMessage {
-                    "a" to 'c'
-                }
-            }
-
-            "anotherAnotherCollection" buildList {
-                addValue("a")
-                addValue("c")
-            }
-        }
-    }
-}
-
-fun message(type: String, connectionID: ConnectionID, bookName: String, setup: MessageBuilder.() -> Unit): Message =
-    MessageBuilder(type, connectionID, bookName).also(setup).build()
+fun message(type: String, connectionID: ConnectionID, setup: MessageBuilder.() -> Unit): Message =
+    MessageBuilder(type, connectionID).also(setup).build()
 
 
 @MessageBuilderMarker
-class MessageBuilder(type: String, connectionID: ConnectionID, bookName: String) {
+class MessageBuilder(type: String, connectionID: ConnectionID) {
     private val builder: Message.Builder = Message.newBuilder()
 
     init {
         builder.metadataBuilder.messageType = type
         builder.metadataBuilder.setId(
             MessageID.newBuilder()
-                .setBookName(bookName)
+                .setBookName(DUMMY_BOOK_NAME)
                 .setTimestamp(Instant.now().toTimestamp())
                 .setConnectionId(connectionID)
         )
@@ -106,6 +63,10 @@ class MessageBuilder(type: String, connectionID: ConnectionID, bookName: String)
      * Builds a [Message] according to the current state of this builder.
      */
     internal fun build(): Message = builder.build()
+
+    companion object {
+        private const val DUMMY_BOOK_NAME = "dummy"
+    }
 }
 
 

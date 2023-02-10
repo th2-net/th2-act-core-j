@@ -36,7 +36,11 @@ import java.io.IOException
 
 private val LOGGER = KotlinLogging.logger {}
 
-class EventRouter(private val eventBatchRouter: MessageRouter<EventBatch>, val bookName: BookName) {
+class EventRouter(
+    private val eventBatchRouter: MessageRouter<EventBatch>,
+    private val actBookName: BookName,
+    private val actScope: String? = null
+) {
 
     /**
      * Submits the specified event to the underlying event batch router.
@@ -339,7 +343,7 @@ class EventRouter(private val eventBatchRouter: MessageRouter<EventBatch>, val b
      * can be specified.
      */
     private fun Event.asProto(parentEventID: EventID?) = try {
-            parentEventID?.let { toProto(it) } ?: toProto(bookName)
+            parentEventID?.let { toProto(it) } ?: toProto(actBookName, actScope)
         } catch (e: JsonProcessingException) {
             throw EventSubmissionException("Couldn't parse event $this.", e)
     }

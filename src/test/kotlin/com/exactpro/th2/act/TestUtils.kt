@@ -157,7 +157,7 @@ fun TestMessageType.toMessage(
             MessageID.newBuilder()
                 .setConnectionId(connectionID)
                 .setDirection(direction)
-                .setBookName("bookName")
+                .setBookName(DUMMY_BOOK_NAME)
                 .setSequence(1)
                 .setTimestamp(Instant.now().toTimestamp()))
 
@@ -212,7 +212,11 @@ fun Message.toBatch(): MessageBatch = MessageBatch.newBuilder().addMessages(this
 /**
  * Creates an [EventID] from this string.
  */
-fun String.toEventID(): EventID = EventID.newBuilder().setId(this).setBookName("bookName").build()
+fun String.toEventID(): EventID = EventID.newBuilder()
+    .setId(this)
+    .setBookName(DUMMY_BOOK_NAME)
+    .setScope(DUMMY_SCOPE_NAME)
+    .build()
 
 /**
  * Creates an [Event] from this event ID.
@@ -269,3 +273,6 @@ fun randomRequest(): IRequest = Request(
  * Returns a random [Event.Status]
  */
 fun randomEventStatus(): Event.Status = Event.Status.values().random()
+
+const val DUMMY_BOOK_NAME = "dummy"
+const val DUMMY_SCOPE_NAME = "dummy"

@@ -16,6 +16,8 @@
 
 package com.exactpro.th2.act.core.action
 
+import com.exactpro.th2.act.DUMMY_BOOK_NAME
+import com.exactpro.th2.act.DUMMY_SCOPE_NAME
 import com.exactpro.th2.act.core.managers.MessageBatchListener
 import com.exactpro.th2.act.core.managers.SubscriptionManager
 import com.exactpro.th2.act.core.routers.EventRouter
@@ -46,7 +48,11 @@ import com.exactpro.th2.common.schema.message.DeliveryMetadata
 class TestDSL {
     lateinit var messageRouter: MessageRouter
     lateinit var eventRouter: EventRouter
-    val parentEventID: EventID = EventID.newBuilder().setId("eventId").setBookName("book").setScope("scope").build()
+    val parentEventID: EventID = EventID.newBuilder()
+        .setId("eventId")
+        .setBookName(DUMMY_BOOK_NAME)
+        .setScope(DUMMY_SCOPE_NAME)
+        .build()
     val subscriptionManager: SubscriptionManager = spyk()
     lateinit var actionFactory: ActionFactory
     var observer: StreamObserver<Message> = spyk()
@@ -60,7 +66,7 @@ class TestDSL {
     internal fun setUp() {
         val messageBatchRouter: StubMessageRouter<MessageBatch> = spyk()
         messageRouter = MessageRouter(messageBatchRouter)
-        eventRouter = EventRouter(eventBatchRouter, "bookName")
+        eventRouter = EventRouter(eventBatchRouter, DUMMY_BOOK_NAME, DUMMY_SCOPE_NAME)
 
         val listeners: Map<Direction, MessageBatchListener> = mapOf(
             Direction.FIRST to getMockListener("First Direction Mock"),
@@ -86,7 +92,7 @@ class TestDSL {
         direction: Direction,
         sequence: Long,
         field: Map<String, String> = mutableMapOf()
-    ): Message = message(messageType, ConnectionID.newBuilder().setSessionAlias(sessionAlias).build(), "book") {
+    ): Message = message(messageType, ConnectionID.newBuilder().setSessionAlias(sessionAlias).build()) {
             parentEventId = parentEventID
             metadata {
                 this.direction = direction
@@ -332,7 +338,7 @@ class TestDSL {
     }
 
     fun createDQ126(): Message =
-        message("DQ126", ConnectionID.newBuilder().setSessionAlias("sessionAlias").build(), "book") {
+        message("DQ126", ConnectionID.newBuilder().setSessionAlias("sessionAlias").build()) {
         }
 
     fun updateDQ126(dq126: Message, segment: String): Message = dq126.toBuilder()
@@ -463,7 +469,7 @@ class TestDSL {
                 .preFilter { msg -> (msg.direction == Direction.FIRST || msg.direction == Direction.SECOND) && msg.sessionAlias == "sessionAlias" }
                 .execute {
                     send(
-                        message("NewOrderSingle", ConnectionID.newBuilder().setSessionAlias("sessionAlias").build(), "book") {
+                        message("NewOrderSingle", ConnectionID.newBuilder().setSessionAlias("sessionAlias").build()) {
                             parentEventId = parentEventID
                         },
                         timeout = 1000
