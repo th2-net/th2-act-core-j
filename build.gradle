@@ -45,10 +45,10 @@ configurations {
 }
 
 dependencies {
-    api platform("com.exactpro.th2:bom:3.0.0")
+    api platform("com.exactpro.th2:bom:4.1.0")
 
-    api "com.exactpro.th2:common:3.39.3"
-    api "com.exactpro.th2:grpc-check1:3.4.2"
+    api "com.exactpro.th2:common:3.44.0"
+    api "com.exactpro.th2:grpc-check1:3.7.0"
 
     implementation 'io.github.microutils:kotlin-logging:2.1.21'
 
@@ -58,9 +58,6 @@ dependencies {
     // to tests only
     testImplementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.5.2'
 
-    testImplementation("org.slf4j:slf4j-log4j12") {
-        because('need logs in tests')
-    }
     testImplementation "org.junit.jupiter:junit-jupiter:5.7.1"
     testImplementation 'io.strikt:strikt-core:0.34.1'
     testImplementation 'io.mockk:mockk:1.12.4'
