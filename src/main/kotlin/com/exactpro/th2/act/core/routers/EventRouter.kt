@@ -28,6 +28,7 @@ import com.exactpro.th2.common.grpc.MessageID
 import com.exactpro.th2.common.message.messageType
 import com.exactpro.th2.common.message.toTreeTable
 import com.exactpro.th2.common.schema.message.MessageRouter
+import com.exactpro.th2.common.schema.message.impl.rabbitmq.BookName
 import com.fasterxml.jackson.core.JsonProcessingException
 import com.google.protobuf.TextFormat
 import mu.KotlinLogging
@@ -35,7 +36,11 @@ import java.io.IOException
 
 private val LOGGER = KotlinLogging.logger {}
 
-class EventRouter(private val eventBatchRouter: MessageRouter<EventBatch>) {
+class EventRouter(
+    private val eventBatchRouter: MessageRouter<EventBatch>,
+    private val actBookName: BookName,
+    private val actScope: String? = null
+) {
 
     /**
      * Submits the specified event to the underlying event batch router.
@@ -338,7 +343,7 @@ class EventRouter(private val eventBatchRouter: MessageRouter<EventBatch>) {
      * can be specified.
      */
     private fun Event.asProto(parentEventID: EventID?) = try {
-            this.toProto(parentEventID)
+            parentEventID?.let { toProto(it) } ?: toProto(actBookName, actScope)
         } catch (e: JsonProcessingException) {
             throw EventSubmissionException("Couldn't parse event $this.", e)
     }

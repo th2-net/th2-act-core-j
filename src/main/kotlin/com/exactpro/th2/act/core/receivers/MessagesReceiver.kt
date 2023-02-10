@@ -23,6 +23,7 @@ import com.exactpro.th2.act.core.rules.PreFilterRule
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.grpc.MessageBatch
+import com.exactpro.th2.common.schema.message.DeliveryMetadata
 import com.exactpro.th2.common.schema.message.MessageListener
 import mu.KotlinLogging
 import java.util.*
@@ -58,8 +59,8 @@ class MessagesReceiver(
     }
 
     private fun createMessageListener(): MessageListener<MessageBatch> =
-        MessageListener { tag: String, batch: MessageBatch ->
-            LOGGER.debug("Received message batch of size ${batch.messagesCount}. Consumer Tag: $tag")
+        MessageListener { metadata: DeliveryMetadata, batch: MessageBatch ->
+            LOGGER.debug("Received message batch of size ${batch.messagesCount}. Delivery metadata: $metadata")
             for (message in batch.messagesList) {
                 if (preFilterRule.onMessage(message)) {
 

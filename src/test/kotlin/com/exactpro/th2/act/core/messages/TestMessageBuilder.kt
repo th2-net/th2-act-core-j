@@ -17,19 +17,11 @@
 package com.exactpro.th2.act.core.messages
 
 import com.exactpro.th2.act.TestField
-import com.exactpro.th2.act.TestMessageType
-import com.exactpro.th2.act.randomField
-import com.exactpro.th2.act.randomString
 import com.exactpro.th2.common.grpc.ConnectionID
-import com.exactpro.th2.common.grpc.ListValue
 import com.exactpro.th2.common.grpc.Message
-import com.exactpro.th2.common.grpc.MessageMetadata
 import com.exactpro.th2.common.message.messageType
-import com.exactpro.th2.common.value.add
 import com.exactpro.th2.common.value.toValue
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.EnumSource
 import strikt.api.expect
 import strikt.assertions.containsExactly
 import strikt.assertions.getValue
@@ -79,8 +71,7 @@ internal class TestMessageBuilder {
 
     @Test
     fun `test should add correct connection id`() {
-        val message = message("test", ConnectionID.newBuilder().setSessionAlias("alias").build()) {
-        }
+        val message = message("test", ConnectionID.newBuilder().setSessionAlias("alias").build()) {}
 
         expect {
             that(message).get { metadata }.get { id }.get { connectionId }

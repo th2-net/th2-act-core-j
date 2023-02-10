@@ -16,6 +16,7 @@
 
 package com.exactpro.th2.act.stubs
 
+import com.exactpro.th2.common.schema.message.ExclusiveSubscriberMonitor
 import com.exactpro.th2.common.schema.message.MessageListener
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.common.schema.message.MessageRouterContext
@@ -62,7 +63,9 @@ class StubMessageRouter<T: Any>: MessageRouter<T> {
 
     override fun subscribe(callback: MessageListener<T>, vararg queueAttr: String) = fail()
 
-    override fun subscribeAll(callback: MessageListener<T>) = fail()
-
     override fun subscribeAll(callback: MessageListener<T>, vararg queueAttr: String) = fail()
+
+    override fun subscribeExclusive(callback: MessageListener<T>?): ExclusiveSubscriberMonitor { fail() }
+
+    override fun sendExclusive(queue: String?, message: T) { fail() }
 }

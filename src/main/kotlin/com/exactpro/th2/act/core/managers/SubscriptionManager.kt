@@ -17,6 +17,7 @@ package com.exactpro.th2.act.core.managers
 
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.MessageBatch
+import com.exactpro.th2.common.schema.message.DeliveryMetadata
 import com.exactpro.th2.common.schema.message.MessageListener
 import com.google.protobuf.TextFormat
 import mu.KotlinLogging
@@ -41,7 +42,7 @@ class SubscriptionManager: MessageListener<MessageBatch>, ISubscriptionManager {
         return getMessageListeners(direction).remove(listener)
     }
 
-    override fun handler(consumerTag: String, messageBatch: MessageBatch) {
+    override fun handle(deliveryMetadata: DeliveryMetadata, messageBatch: MessageBatch) {
         if (messageBatch.messagesCount <= 0) {
             LOGGER.warn { "Empty batch received ${TextFormat.shortDebugString(messageBatch)}" }
             return
@@ -58,7 +59,7 @@ class SubscriptionManager: MessageListener<MessageBatch>, ISubscriptionManager {
 
         listeners.forEach { listener ->
             try {
-                listener.handler(consumerTag, messageBatch)
+                listener.handle(deliveryMetadata, messageBatch)
             } catch (e: Exception) {
                 LOGGER.error(e) {
                     "Cannot handle batch from $direction. Batch: ${TextFormat.shortDebugString(messageBatch)}"

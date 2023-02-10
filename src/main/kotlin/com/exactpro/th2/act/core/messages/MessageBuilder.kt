@@ -17,54 +17,14 @@
 package com.exactpro.th2.act.core.messages
 
 import com.exactpro.th2.common.grpc.*
+import com.exactpro.th2.common.message.toTimestamp
+import com.exactpro.th2.common.schema.message.impl.rabbitmq.BookName
 import com.exactpro.th2.common.value.nullValue
 import com.exactpro.th2.common.value.toValue
+import java.time.Instant
 
 @DslMarker
 annotation class MessageBuilderMarker
-
-fun main() {
-    val connectionID = ConnectionID.getDefaultInstance()
-    message("MessageType", connectionID) {
-        metadata {
-            protocol = "fix"
-            addProperty("name", "value")
-            // or
-            properties = mapOf(
-                "name" to "value"
-            )
-        }
-        body {
-            "field" to "simple value"
-            "complex" to message {
-                "field" to 1
-            }
-            "collection" to list[1, 2, 3, 4]
-            "complexCollection" to list[
-                    message {
-                        "field" to 'a'
-                    },
-                    message {
-                        "field" to 'b'
-                    }
-            ]
-            "anotherCollection" buildList {
-                addMessage {
-                    "a" to 'b'
-                }
-
-                addMessage {
-                    "a" to 'c'
-                }
-            }
-
-            "anotherAnotherCollection" buildList {
-                addValue("a")
-                addValue("c")
-            }
-        }
-    }
-}
 
 fun message(type: String, connectionID: ConnectionID, setup: MessageBuilder.() -> Unit): Message =
     MessageBuilder(type, connectionID).also(setup).build()
@@ -76,7 +36,12 @@ class MessageBuilder(type: String, connectionID: ConnectionID) {
 
     init {
         builder.metadataBuilder.messageType = type
-        builder.metadataBuilder.setId(MessageID.newBuilder().setConnectionId(connectionID))
+        builder.metadataBuilder.setId(
+            MessageID.newBuilder()
+                .setBookName(DUMMY_BOOK_NAME)
+                .setTimestamp(Instant.now().toTimestamp())
+                .setConnectionId(connectionID)
+        )
     }
 
     var parentEventId: EventID
@@ -98,6 +63,10 @@ class MessageBuilder(type: String, connectionID: ConnectionID) {
      * Builds a [Message] according to the current state of this builder.
      */
     internal fun build(): Message = builder.build()
+
+    companion object {
+        private const val DUMMY_BOOK_NAME = "dummy"
+    }
 }
 
 

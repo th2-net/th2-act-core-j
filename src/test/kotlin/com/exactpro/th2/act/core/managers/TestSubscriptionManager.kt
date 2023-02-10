@@ -20,6 +20,7 @@ import com.exactpro.th2.act.randomMessage
 import com.exactpro.th2.act.randomString
 import com.exactpro.th2.act.toBatch
 import com.exactpro.th2.common.grpc.*
+import com.exactpro.th2.common.schema.message.DeliveryMetadata
 import com.exactpro.th2.common.schema.message.MessageListener
 import io.mockk.*
 import org.junit.jupiter.api.BeforeEach
@@ -35,9 +36,9 @@ internal class TestSubscriptionManager {
      */
     fun getMockListener(name: String? = null): MessageBatchListener {
         return if (name == null) {
-            mockk { justRun { handler(any(), any()) } }
+            mockk { justRun { handle(any(), any()) } }
         } else {
-            mockk(name) { justRun { handler(any(), any()) } }
+            mockk(name) { justRun { handle(any(), any()) } }
         }
     }
 
@@ -58,16 +59,16 @@ internal class TestSubscriptionManager {
 
         listeners.forEach { (direction, listener) -> subscriptionManager.register(direction, listener) }
 
-        val consumerTag = randomString()
+        val consumerTag = DeliveryMetadata(randomString())
         val messageBatch = randomMessage(direction = message_direction).toBatch()
 
-        subscriptionManager.handler(consumerTag, messageBatch)
+        subscriptionManager.handle(consumerTag, messageBatch)
 
         listeners.map { (direction, listener) ->
             if (direction == message_direction) {
-                verify { listener.handler(consumerTag, messageBatch) }
+                verify { listener.handle(consumerTag, messageBatch) }
             } else {
-                verify(exactly = 0) { listener.handler(any(), any()) }
+                verify(exactly = 0) { listener.handle(any(), any()) }
             }
         }
     }
@@ -89,12 +90,12 @@ internal class TestSubscriptionManager {
 
         listeners.forEach { (direction, listener) -> subscriptionManager.register(direction, listener) }
 
-        val consumerTag = randomString()
+        val consumerTag = DeliveryMetadata(randomString())
         val messageBatch = MessageBatch.getDefaultInstance()
 
-        subscriptionManager.handler(consumerTag, messageBatch)
+        subscriptionManager.handle(consumerTag, messageBatch)
 
-        listeners.values.map { verify(exactly = 0) { it.handler(any(), any()) } }
+        listeners.values.map { verify(exactly = 0) { it.handle(any(), any()) } }
     }
 
     @Test
@@ -115,12 +116,12 @@ internal class TestSubscriptionManager {
                 .setMetadata(MessageMetadata.newBuilder().setId(messageID).build())
                 .build()
 
-        val consumerTag = randomString()
+        val consumerTag = DeliveryMetadata(randomString())
         val messageBatch = message.toBatch()
 
-        subscriptionManager.handler(consumerTag, messageBatch)
+        subscriptionManager.handle(consumerTag, messageBatch)
 
-        listeners.values.forEach { verify(exactly = 0) { it.handler(any(), any()) } }
+        listeners.values.forEach { verify(exactly = 0) { it.handle(any(), any()) } }
     }
 
     @ParameterizedTest
@@ -131,11 +132,11 @@ internal class TestSubscriptionManager {
         subscriptionManager.register(direction, listener)
         subscriptionManager.unregister(direction, listener)
 
-        val consumerTag = randomString()
+        val consumerTag = DeliveryMetadata(randomString())
         val messageBatch = randomMessage(direction = direction).toBatch()
 
-        subscriptionManager.handler(consumerTag, messageBatch)
+        subscriptionManager.handle(consumerTag, messageBatch)
 
-        verify(exactly = 0) { listener.handler(any(), any()) }
+        verify(exactly = 0) { listener.handle(any(), any()) }
     }
 }
